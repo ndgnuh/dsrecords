@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ezrecords"
+description = "Easy to hack and simple RecordIO-like data storing. Inspired by MXNet's RecordIO and Protobuf."
+version = "0.1.0"
+authors = [{ name = "Hùng Nguyễn", email = "ndgnuh@protonmail.com" }]
+readme = "README.md"
+keywords = ["RecordIO"]
+license = { text = "MIT" }
+
+[tool.setuptools.package-dir]
+ezrecords = "src"
