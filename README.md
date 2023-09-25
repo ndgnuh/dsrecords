@@ -11,7 +11,7 @@ Easy to hack and simple RecordIO-like data storing. Inspired by MXNet's RecordIO
 
 ## Quick start
 
-See (this notebook)[https://github.com/ndgnuh/ezrecords/blob/master/Examples.ipynb] for how to use the library.
+See [this notebook](https://github.com/ndgnuh/ezrecords/blob/master/Examples.ipynb) for how to use the library.
 
 ## Motivation
 
