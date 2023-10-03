@@ -6,7 +6,10 @@ Easy to hack and simple RecordIO-like data storing. Inspired by MXNet's RecordIO
 
 - [x] Binary-based data format with index file
 - [x] Easy custom serialization schemes (RecordFormat)
-- [ ] Common serialization schemes
+- [x] Common serialization schemes:
+    - Int/Float
+    - PIL image (Pillow is lazy loaded)
+    - More to be added
 - [ ] Documentation
 
 ## Quick start
