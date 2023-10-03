@@ -1,45 +1,4 @@
-import struct
-from abc import ABC, abstractmethod
-from typing import Generic, Iterable, List, Sequence, TypeVar
-
-T = TypeVar("T")
-
-
-class RecordFormat(ABC, Generic[T]):
-    @abstractmethod
-    def serialize(self, record: T) -> Sequence[bytes]:
-        ...
-
-    @abstractmethod
-    def deserialize(record_bins: Sequence[bytes]) -> T:
-        ...
-
-
-class IndexFile:
-    def __init__(self, path: str):
-        self.path = path
-
-    def write(self, offsets: List[int]):
-        with open(self.path, "w+b") as io:
-            n = len(offsets)
-            io.write(struct.pack("<Q", n))
-            for offset in offsets:
-                io.write(struct.pack("<Q", offset))
-
-    def __len__(self):
-        with open(self.path, "r+b") as io:
-            (n,) = struct.unpack("<Q", io.read(8))
-        return n
-
-    def __getitem__(self, idx):
-        assert idx < len(self)
-        with open(self.path, "r+b") as io:
-            io.seek((idx + 1) * 8)
-            (offset,) = struct.unpack("<Q", io.read(8))
-        return offset
-
-
-def make_dataset(
+def make_dataset_v1(
     record_iters: Iterable,
     record_file: str,
     index_file: str,
