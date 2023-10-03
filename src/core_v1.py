@@ -1,4 +1,20 @@
-def make_dataset_v1(
+from abc import ABC, abstractmethod
+from typing import Generic, Iterable, Sequence, TypeVar
+
+T = TypeVar("T")
+
+
+class RecordFormat(ABC, Generic[T]):
+    @abstractmethod
+    def serialize(self, record: T) -> Sequence[bytes]:
+        ...
+
+    @abstractmethod
+    def deserialize(record_bins: Sequence[bytes]) -> T:
+        ...
+
+
+def make_dataset(
     record_iters: Iterable,
     record_file: str,
     index_file: str,

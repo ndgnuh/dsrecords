@@ -1,5 +1,6 @@
+import os
 import struct
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 
 class IndexFile:
@@ -29,7 +30,7 @@ class IndexFile:
 def make_dataset(
     record_iters: Iterable,
     output: str,
-    serialize_fns: List,
+    serializers: List,
     index_path: Optional[str] = None,
 ):
     indices = []
@@ -38,9 +39,7 @@ def make_dataset(
     with open(output, "wb") as io:
         for items in record_iters:
             # serialize
-            items_bin = [
-                serialize(items[i]) for i, serialize in enumerate(serialize_fns)
-            ]
+            items_bin = [serialize(items[i]) for i, serialize in enumerate(serializers)]
             headers = [len(b) for b in items_bin]
             headers_bin = [struct.pack("<Q", h) for h in headers]
 
@@ -55,7 +54,7 @@ def make_dataset(
 
     # Write indice files
     if index_path is None:
-        index_path = path.splitext(output)[0] + ".idx"
+        index_path = os.path.splitext(output)[0] + ".idx"
     IndexFile(index_path).write(indices)
     return output, index_path
 
@@ -64,16 +63,16 @@ class EzRecordDataset:
     def __init__(
         self,
         path: str,
-        deserialize_fns: List,
+        deserializers: List,
         index_path: Optional[str] = None,
     ):
         if index_path is None:
             index_path = os.path.splitext(path)[0] + ".idx"
         self.path = path
-        self.deserialize_fns = deserialize_fns
+        self.deserializers = deserializers
         self.index = IndexFile(index_path)
         self.length = len(self.index)
-        self.num_items = len(deserialize_fns)
+        self.num_items = len(deserializers)
 
     def __len__(self):
         return len(self.index)
@@ -81,7 +80,7 @@ class EzRecordDataset:
     def __getitem__(self, idx: int):
         # Inputs
         offset = self.index[idx]
-        fns = self.deserialize_fns
+        fns = self.deserializers
         N = self.num_items
 
         # Deserialize
