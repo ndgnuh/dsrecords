@@ -55,3 +55,18 @@ def float32_serialize(n):
 
 def float32_deserialize(n):
     return struct.unpack("<f", n)[0]
+
+
+@curry
+def str_encode(s, encoding="utf-8"):
+    return s.encode(encoding)
+
+
+@curry
+def str_decode(bs, encoding="utf-8"):
+    return bs.decode(encoding)
+
+
+def identity(bs):
+    # Returns whatever
+    return bs
