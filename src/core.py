@@ -2,6 +2,8 @@ import os
 import struct
 from typing import Iterable, List, Optional
 
+import warning
+
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
 
@@ -64,7 +66,7 @@ def make_dataset(
     return output, index_path
 
 
-class EzRecordDataset:
+class IndexedRecordDataset:
     def __init__(
         self,
         path: str,
@@ -95,3 +97,11 @@ class EzRecordDataset:
             items = [fns[i](io.read(n)) for i, n in enumerate(lens)]
 
         return items
+
+
+class EzRecordDataset(IndexedRecordDataset):
+    def __post_init__(self):
+        warning.warning(
+            "EzRecordDataset is deprecated due to name changes, use IndexedRecordDataset instead",
+            DeprecationWarning,
+        )
