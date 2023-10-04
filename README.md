@@ -1,15 +1,12 @@
-# EZRecords
+# Dead Simple Records
 
-Easy to hack and simple RecordIO-like data storing. Inspired by MXNet's RecordIO and Protobuf.
+Easy to hack and dead simple RecordIO-like data storing. Inspired by MXNet's RecordIO and Protobuf.
 
 ## (planned) features
 
 - [x] Binary-based data format with index file
-- [x] Easy custom serialization schemes (RecordFormat)
-- [x] Common serialization schemes:
-    - Int/Float
-    - PIL image (Pillow is lazy loaded)
-    - More to be added
+- [x] Easy custom serialization schemes
+- [x] Common serialization schemes (more TBA)
 - [ ] Documentation
 
 ## Quick start
