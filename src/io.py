@@ -67,6 +67,23 @@ def str_decode(bs, encoding="utf-8"):
     return bs.decode(encoding)
 
 
+def np_save(x):
+    import numpy as np
+
+    with BytesIO() as io:
+        np.save(io, x)
+        bytes = io.getvalue()
+    return bytes
+
+
+def np_load(bs):
+    import numpy as np
+
+    with BytesIO(bs) as io:
+        x = np.load(io)
+    return x
+
+
 def identity(bs):
     # Returns whatever
     return bs
