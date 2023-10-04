@@ -1,8 +1,7 @@
 import os
 import struct
+import warnings
 from typing import Iterable, List, Optional
-
-import warning
 
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
@@ -101,7 +100,7 @@ class IndexedRecordDataset:
 
 class EzRecordDataset(IndexedRecordDataset):
     def __post_init__(self):
-        warning.warning(
+        warnings.warning(
             "EzRecordDataset is deprecated due to name changes, use IndexedRecordDataset instead",
             DeprecationWarning,
         )
