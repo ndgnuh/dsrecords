@@ -2,6 +2,9 @@ import os
 import struct
 from typing import Iterable, List, Optional
 
+# Reserve for whatever changes in the future
+RESERVED_SPACE = 1024
+
 
 class IndexFile:
     def __init__(self, path: str):
@@ -37,6 +40,8 @@ def make_dataset(
 
     # Write record file
     with open(output, "wb") as io:
+        io.seek(RESERVED_SPACE)
+
         for items in record_iters:
             # serialize
             items_bin = [serialize(items[i]) for i, serialize in enumerate(serializers)]
