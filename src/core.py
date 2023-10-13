@@ -80,6 +80,9 @@ class IndexedRecordDataset:
         self.length = len(self.index)
         self.num_items = len(deserializers)
 
+    def __iter__(self):
+        return iter(self[i] for i in range(len(self)))
+
     def __len__(self):
         return len(self.index)
 
