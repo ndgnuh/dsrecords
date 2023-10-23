@@ -1,0 +1,27 @@
+site_name: DSRecords
+theme: readthedocs
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [ src ]
+          options:
+            show_source: false
+            allow_inspection: true
+            show_root_heading: true
+            separate_signature: true
+            show_if_no_docstring: true
+            show_symbol_type_toc: true
+            unwrap_annotated: true
+            filters: [ "!^_" ]
+            merge_init_into_class: true
+            docstring_section_style: spacy
+            annotation_path: source
+            heading_level: 4
+  - search
