@@ -1,13 +1,14 @@
 # References
 
 !!! warning "This section is not finished"
-    There will be mistakes.
+    There might be mistakes.
 
 ## List of serializers
 
 **All** serializers **must** returns `bytes`.
 
 ::: io.identity
+::: io.save_bool
 ::: io.save_int
 ::: io.save_float
 ::: io.save_str
@@ -18,6 +19,7 @@
 ## List of deserializers
 
 ::: io.identity
+::: io.load_bool
 ::: io.load_int
 ::: io.load_float
 ::: io.load_str
@@ -27,6 +29,8 @@
 ## Other modules
 
 ::: io.kurry
+::: io._get_int_fmt
+::: io._get_float_fmt
 ::: core.make_dataset
 ::: core.IndexedRecordDataset
 ::: core.IndexFile

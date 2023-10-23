@@ -1,9 +1,42 @@
 import struct
 import warnings
-from functools import partial, wraps
+from functools import lru_cache, partial, wraps
 from io import BytesIO
 
 NO_INPUT = object()
+
+
+@lru_cache
+def _get_int_fmt(bits: int, signed: bool) -> str:
+    """Return the integer format for python `struct` modules.
+
+    The returned format is little-endian (has `<` prefix).
+
+    Args:
+        bits (int): The number bitness of the type, should be one of `8, 16, 32, 64, 128`.
+        signed (bool): Whether the integer type is signed.
+    """
+    fmts = {8: "b", 16: "h", 32: "i", 64: "l", 128: "q"}
+    assert bits in fmts.keys()
+    fmt = fmts[bits]
+    if not signed:
+        fmt = fmt.upper()
+    return f"<{fmt}"
+
+
+@lru_cache
+def _get_float_fmt(bits: int) -> str:
+    """Return the float format for python `struct` modules.
+
+    The returned format is little-endian (has `<` prefix).
+
+    Args:
+        bits (int): The number bitness of the type, should be one of `16, 32, 64`.
+    """
+    fmts = {16: "e", 32: "f", 64: "d"}
+    assert bits in fmts.keys()
+    fmt = fmts[bits]
+    return f"<{fmt}"
 
 
 def _deprecated(f_name, new_f):
@@ -95,36 +128,95 @@ def load_pil(image_bin: bytes):
 
 
 @kurry
-def save_int(n, bits=32, signed=True):
-    return struct.pack("<l", n)
+def save_int(n: int, bits: int = 32, signed: bool = True):
+    """Serialize int data.
+
+    Args:
+        n (int): Any integer
+
+    Keyword Args:
+        bits (int):
+            Bitness of type, valid values are `8, 16, 32, 64, 128`, default: `32`.
+        signed (bool):
+            Store in signed format, default: `True`.
+    """
+
+    fmt = _get_int_fmt(bits, signed)
+    return struct.pack(fmt, n)
 
 
 @kurry
-def save_float(n, bits=32):
-    return struct.pack("<f", n)
+def save_float(x: float, bits: int = 32):
+    """Serialize floating point number.
+
+    Args:
+        x (int): Any float
+
+    Keyword Args:
+        bits (int):
+            Bitness of type, valid values are ` 16, 32, 64`, default: `32`.
+    """
+    fmt = _get_float_fmt(bits)
+    return struct.pack(fmt, x)
 
 
 @kurry
-def save_str(s, encoding="utf-8"):
+def save_str(s: str, encoding: str = "utf-8"):
+    """Serialize string data
+
+    Args:
+        s (bytes): String data to be serialized.
+
+    Keyword Args:
+        encoding (str): String encoding (default: `utf-8`).
+    """
     return s.encode(encoding)
 
 
 @kurry
-def load_int(data, bits=32):
-    return struct.unpack("<l", data)[0]
+def save_bool(b: bool):
+    """Serialize bool data"""
+    return struct.pack("<?", b)
 
 
 @kurry
-def load_float(n, bits=32):
-    return struct.unpack("<f", n)[0]
+def load_bool(b: bool):
+    """Deserialize bool data"""
+    return struct.unpack("<?", b)[0]
 
 
 @kurry
-def load_str(str_bin, encoding="utf-8"):
-    return str_bin.decode(encoding)
+def load_int(data: bytes, bits: int = 32, signed: bool = True):
+    """Deserialize integers, see `io.save_int` for options."""
+    fmt = _get_int_fmt(bits, signed)
+    return struct.unpack(fmt, data)[0]
+
+
+@kurry
+def load_float(data: bytes, bits: int = 32):
+    """Deserialize floats, see `io.save_float` for options."""
+    fmt = _get_float_fmt(bits)
+    return struct.unpack(fmt, data)[0]
+
+
+@kurry
+def load_str(data: bytes, encoding: str = "utf-8"):
+    """Deserialize string data
+
+    Args:
+        data (bytes): String data.
+
+    Keyword Args:
+        encoding (str): String encoding (default: `utf-8`).
+    """
+    return data.decode(encoding)
 
 
 def save_np(x):
+    """Serialize a numpy array.
+
+    Args:
+        x (np.ndarray): The numpy array to beserialized"""
     import numpy as np
 
     with BytesIO() as io:
@@ -134,6 +226,7 @@ def save_np(x):
 
 
 def load_np(bs):
+    """Deserialize a numpy array."""
     import numpy as np
 
     with BytesIO(bs) as io:
@@ -156,3 +249,5 @@ def identity(bs: bytes) -> bytes:
 _deprecated("file_serialize", save_raw_file)
 _deprecated("pil_serialize", save_pil)
 _deprecated("np_save", save_np)
+_deprecated("int32_serialize", save_int(bits=32, signed=False))
+_deprecated("int32_deserialize", save_int(bits=32, signed=False))
