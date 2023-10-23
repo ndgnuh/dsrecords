@@ -44,9 +44,9 @@ def kurry(fn):
     @wraps(fn)
     def wrapped(x=NO_INPUT, **kwargs):
         if x is NO_INPUT:
-            return partial(f, **kwargs)
+            return partial(fn, **kwargs)
         else:
-            return f(x, **kwargs)
+            return fn(x, **kwargs)
 
     return wrapped
 
@@ -156,7 +156,3 @@ def identity(bs: bytes) -> bytes:
 _deprecated("file_serialize", save_raw_file)
 _deprecated("pil_serialize", save_pil)
 _deprecated("np_save", save_np)
-
-
-def save_int(n, bits=32, signed=True):
-    return struct.pack("<l", n)

@@ -4,10 +4,13 @@ import tempfile
 import pytest
 from dsrecords import IndexedRecordDataset, io, make_dataset
 
+save_uint32 = io.save_int(bits=32, signed=False)
+load_uint32 = io.load_int(bits=32, signed=False)
+
 
 def test_append_vs_create():
     dataset = [[random.randint(0, 2 ^ 64)] for _ in range(1000)]
-    serializers = [io.int32_serialize]
+    serializers = [save_uint32]
 
     # first write
     file_a = tempfile.NamedTemporaryFile("r+b")
