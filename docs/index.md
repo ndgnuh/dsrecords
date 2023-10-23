@@ -14,8 +14,8 @@ pip install git+https://gitlab.com/ndgnuh/dsrecords.git
 
 - [Create a record dataset](#create-a-record-dataset)
 - [Load a dataset](#load-a-dataset)
-- [The `io` submodule](#NA)
-- [File format reference](#NA)
+- [Supported data formats reference](/formats)
+- [Dataset format reference](/records-format)
 
 ## Create a record dataset
 
@@ -35,7 +35,7 @@ ys = [math.sin(x) for x in xs]
 zs = [int(x) for x in xs]
 
 # Setup the schema
-serializers = [io.float32_serialize, io.float32_serialize, io.int32_serialize]
+serializers = [io.save_float, io.save_float, io.save_int]
 
 # Generate the record dataset files
 output_path, index_path = make_dataset(
@@ -59,7 +59,7 @@ ys = [math.sin(x) for x in xs]
 zs = [int(x) for x in xs]
 
 # Setup the schema
-serializers = [io.float32_serialize, io.float32_serialize, io.int32_serialize]
+serializers = [io.save_float, io.save_float, io.save_int]
 
 # Generate the record dataset files
 data = IndexedRecordDataset(record_path, serializers=serializers)
@@ -86,7 +86,7 @@ from dsrecords import io, IndexedRecordDataset
 record_path = "my_data.rec"
 
 # Specify schema
-deserializers = [io.float32_deserialize, io.float32_deserialize, io.int32_deserialize]
+deserializers = [io.load_float, io.load_float, io.load_int]
 
 # Load the data
 data = IndexedRecordDataset(record_path, deserializers=deserializers)
