@@ -1,6 +1,6 @@
 stages:          # List of stages for jobs, and their order of execution
-  - test
-    #   - docs # Not yet
+    - test
+    - docs # Not yet
 
 run-test:
     stage: test
@@ -9,5 +9,14 @@ run-test:
         - pip install pytest
         - pip install .
         - python -m pytest -s test.py
+    rules:
+        - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/
+
+pages:
+    stage: docs
+    image: python:3.11-slim-bookworm
+    script:
+        - pip install mkdocs mkdocstrings mkdocstrings-python pymdown-extensions black
+        - mkdocs build --site-dir public
     rules:
         - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/
