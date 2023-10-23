@@ -125,8 +125,8 @@ class IndexedRecordDataset:
 
         return items
 
-    def append(self, *items):
-        if not os.path.isfile(self.path):
+    def append(self, items):
+        if not os.path.isfile(self.path) or len(self) == 0:
             with open(self.path, "wb") as io:
                 fmt = "<" + "b" * RESERVED_SPACE
                 io.write(struct.pack(fmt, *([0] * RESERVED_SPACE)))
