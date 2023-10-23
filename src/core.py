@@ -126,6 +126,11 @@ class IndexedRecordDataset:
         return items
 
     def append(self, *items):
+        if not os.path.isfile(self.path):
+            with open(self.path, "wb") as io:
+                fmt = "<" + "b" * RESERVED_SPACE
+                io.write(struct.pack(fmt, *([0] * RESERVED_SPACE)))
+
         msg = "You need serializers for reading the data"
         assert self.serializers is not None, msg
         items_bin = [
