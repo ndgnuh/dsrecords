@@ -1,0 +1,13 @@
+stages:          # List of stages for jobs, and their order of execution
+  - test
+    #   - docs # Not yet
+
+run-test:
+    stage: test
+    image: python:3.11-slim-bookworm
+    script:
+        - pip install pytest
+        - pip install .
+        - python -m pytest -s
+    rules:
+        - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/
