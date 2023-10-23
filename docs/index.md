@@ -14,8 +14,8 @@ pip install git+https://gitlab.com/ndgnuh/dsrecords.git
 
 - [Create a record dataset](#create-a-record-dataset)
 - [Load a dataset](#load-a-dataset)
-- [Supported data formats reference](/formats)
-- [Dataset format reference](/records-format)
+- [Supported data formats reference](formats.md)
+- [Dataset format reference](records-format.md)
 
 ## Create a record dataset
 

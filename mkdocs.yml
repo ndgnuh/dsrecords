@@ -1,5 +1,6 @@
 site_name: DSRecords
 theme: readthedocs
+site_url: https://ndgnuh.gitlab.com/dsrecords
 
 markdown_extensions:
   - admonition
