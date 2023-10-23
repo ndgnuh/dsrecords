@@ -1,6 +1,6 @@
-stages:          # List of stages for jobs, and their order of execution
+stages:
     - test
-    - docs # Not yet
+    - docs
 
 run-test:
     stage: test
@@ -19,7 +19,7 @@ pages:
         - pip install mkdocs mkdocstrings mkdocstrings-python pymdown-extensions black
         - mkdocs build --site-dir public
     rules:
-        - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/
+        - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/ || $CI_COMMIT_MESSAGE =~ /\[docs\]/
     artifacts:
         when: on_success
         expire_in: 1 days
