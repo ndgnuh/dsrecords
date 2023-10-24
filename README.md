@@ -1,3 +1,7 @@
+# Project was moved
+
+Head over to https://gitlab.com/ndnguh/dsrecords
+
 # Dead Simple Records
 
 Easy to hack and dead simple RecordIO-like data storing. Inspired by MXNet's RecordIO and Protobuf.
