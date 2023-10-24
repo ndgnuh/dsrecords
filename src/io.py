@@ -2,7 +2,9 @@ import struct
 import warnings
 from functools import lru_cache, partial, wraps
 from io import BytesIO
+from typing import Callable, List, TypeVar
 
+T = TypeVar("T")
 NO_INPUT = object()
 
 
@@ -241,6 +243,52 @@ def identity(bs: bytes) -> bytes:
         bs (bytes): Raw bytes.
     """
     return bs
+
+
+@kurry
+def save_list(lst: List[T], save_fn: Callable[T, bytes]) -> bytes:
+    """Serialize list of arbitrary items.
+
+    Args:
+        lst (List[T]): A list of items of type `T`.
+        save_fn (Callable[T, bytes]): The function to serialize data of type `T`.
+    """
+    # Because without length, the deserializer will have to read until read result is empty
+    # a while-true loop in a repeatedly called function seems pretty cursed
+    n = len(lst)
+    with BytesIO() as f:
+        length = struct.pack("<L", len(lst))
+        f.write(length)
+        for item in lst:
+            data = save_fn(item)
+            header = struct.pack("<L", len(data))
+            f.write(header)
+            f.write(data)
+        f.seek(0)
+        bs = f.read()
+    return bs
+
+
+@kurry
+def load_list(data, load_fn):
+    """Deserialize list of arbitrary items.
+
+    Args:
+        data (bytes): Raw data.
+        load_fn (Callable[bytes, T]): The function to serialize data of type `T`.
+    """
+
+    def wrapped_deserializer(f):
+        # Unsigned long is 4 bit
+        header = f.read(4)
+        (n,) = struct.unpack("<L", header)
+        data = load_fn(f.read(n))
+        return data
+
+    with BytesIO(data) as f:
+        (length,) = struct.unpack("<L", f.read(4))
+        outputs = [wrapped_deserializer(f) for _ in range(length)]
+    return outputs
 
 
 # Deprecated serializers

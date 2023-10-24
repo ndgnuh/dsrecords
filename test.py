@@ -30,3 +30,38 @@ def test_append_vs_create():
     with open(index_a, "rb") as f_a:
         with open(index_b, "rb") as f_b:
             assert f_a.read() == f_b.read()
+
+
+def test_example_list_serializers():
+    # Basic
+    txt = "The quick brown fox jumps over the lazy dog".split()
+    data_bin = io.save_list(txt, save_fn=io.save_str)
+    txt_ = io.load_list(data_bin, load_fn=io.load_str)
+    assert " ".join(txt) == " ".join(txt_)
+
+    # Curry
+    txt = "The quick brown fox jumps over the lazy dog".split()
+    save_fn = io.save_list(save_fn=io.save_str)
+    load_fn = io.load_list(load_fn=io.load_str)
+    txt_ = load_fn(save_fn(txt))
+    assert " ".join(txt) == " ".join(txt_)
+
+    # Nested
+    txt_list = [
+        "The quick brown fox jumps over the lazy dog",
+        "Do bạch kim rất quý nên sẽ dùng để lắm vô xương",
+    ]
+    nested_txt_list_1 = [txt.split(" ") for txt in txt_list]
+
+    # Schemas
+    save_fn = io.save_list(save_fn=io.save_list(save_fn=io.save_str))
+    load_fn = io.load_list(load_fn=io.load_list(load_fn=io.load_str))
+
+    # Serialize and deserialize
+    data_bin = save_fn(nested_txt_list_1)
+    nested_txt_list_2 = load_fn(data_bin)
+
+    # Check
+    txt_1 = "\n".join([" ".join(txt) for txt in nested_txt_list_1])
+    txt_2 = "\n".join([" ".join(txt) for txt in nested_txt_list_2])
+    assert txt_1 == txt_2
