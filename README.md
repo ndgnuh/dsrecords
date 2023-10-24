@@ -1,6 +1,6 @@
 # Project was moved
 
-Head over to https://gitlab.com/ndnguh/dsrecords
+Head over to https://gitlab.com/ndgnuh/dsrecords
 
 # Dead Simple Records
 
