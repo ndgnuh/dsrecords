@@ -12,10 +12,31 @@ RESERVED_BYTES = struct.pack("<" + "x" * RESERVED_SPACE)
 
 
 class IndexFile:
+    """File object to interact with index file.
+
+    Index file is the file that store the offsets
+    to each of the data points in the respective data file.
+
+    Args:
+        path (str):
+            Path to the index file. Does not need to exist.
+
+    Attributes:
+        path (str): Path to the physical index file.
+    """
+
     def __init__(self, path: str):
         self.path = path
 
     def write(self, offsets: List[int]):
+        """Write a list of offsets to the index file.
+
+        !!! warning "This operation will create a new physical index file."
+            *All the old offsets will be lost.* For adding new offsets without deleting the old ones, use `append` instead.
+
+        Args:
+            offsets (List[int]): List of offsets.
+        """
         with open(self.path, "wb") as io:
             n = len(offsets)
             io.write(struct.pack("<Q", n))
@@ -42,7 +63,14 @@ class IndexFile:
         n = len(self)
         return f"Index file with {n} items"
 
-    def append(self, idx):
+    def append(self, offset: int):
+        """Append offset to the index file.
+
+        If the file does not exists, the file will be created.
+
+        Args:
+            offset (int): the offset to be added.
+        """
         n = len(self)
         mode = "wb" if n == 0 else "rb+"
         with open(self.path, mode) as io:
@@ -52,15 +80,25 @@ class IndexFile:
 
             # Add index
             io.seek(0, SEEK_END)
-            io.write(struct.pack("<Q", idx))
+            io.write(struct.pack("<Q", offset))
 
-    def quick_remove_at(self, i):
+    def quick_remove_at(self, idx: int):
         """Quickly remove an index by writing the index at the end to that index position.
 
-        WARNING: This does not preserve the position of the index.
+        Conceptually, this operation do:
+        ```python
+        offsets[idx] = offsets.pop(-1)
+        ```
+
+        !!! warning "This operation does not preserve the position of the index"
+            For example, the offset values `[0, 8, 16, 24, 32]` will be come `[0, 8, 32, 24]` if we remove the index `2`.
+
+        To actually preserve the order, we would have to offset the
+        content of the whole index file to the left, which is not
+        cheap at all.
 
         Args:
-            i (int): The index to be removed
+            idx (int): The index to be removed
         """
         n = len(self)
         with open(self.path, "rb+") as f:
@@ -126,6 +164,26 @@ def make_dataset(
 
 
 class IndexedRecordDataset:
+    """Wrapper object to work with record and index files.
+
+    Attributes:
+        path (str):
+            Path to the dataset file.
+        deserializers (Optional[List[Callable]]):
+            A list of functions that take a `bytes` and return something.
+            This is required for accessing data.
+            Default: `None`.
+        serializers (Optional[List[Callable]]):
+            A list of functions that take something and return a `bytes`.
+            This is required for appending new samples.
+            Default: `None`.
+        index_path (str):
+            Path to the index file, will be guessed from `path`.
+            For convenience, dataset file and index file normally
+            have the same basename, only their extension are different.
+            Default: `None`.
+    """
+
     def __init__(
         self,
         path: str,
@@ -142,12 +200,23 @@ class IndexedRecordDataset:
 
     @cached_property
     def num_items(self):
+        """Number of items in each data sample."""
         return len(self.deserializers)
 
-    def quick_remove_at(self, i):
-        self.index.quick_remove_at(i)
+    def quick_remove_at(self, idx):
+        """Just a wrapper for `IndexFile.quick_remove_at`."""
+        self.index.quick_remove_at(idx)
 
-    def defrag(self, output_file):
+    def defrag(self, output_file: str):
+        """Defragment the dataset.
+
+        When you perform a lot of deletions, the dataset file becomes sparse.
+        This operation create a new dataset file will no "holes" inside.
+        The content will be preserved.
+
+        !!! info "Defrag does not sort the index file"
+            The `defrag` operation use the order inside the index file, so the index will not be sorted.
+        """
         ref_data = deepcopy(self)
         ref_data.deserializers = [lambda x: x for _ in self.deserializers]
         serializers = [lambda x: x for _ in self.deserializers]
@@ -159,6 +228,7 @@ class IndexedRecordDataset:
         return make_dataset(data_iter(), output_file, serializers=serializers)
 
     def __iter__(self):
+        """Iterate through this dataset"""
         return iter(self[i] for i in range(len(self)))
 
     def __len__(self):
@@ -181,7 +251,14 @@ class IndexedRecordDataset:
 
         return items
 
-    def append(self, items):
+    def append(self, items: Tuple):
+        """Append new items to the dataset.
+
+        Serializers are required for appending new items.
+
+        Args:
+            items (Tuple): A single data sample.
+        """
         if not os.path.isfile(self.path) or len(self) == 0:
             with open(self.path, "wb") as io:
                 io.write(RESERVED_BYTES)
@@ -204,6 +281,8 @@ class IndexedRecordDataset:
 
 
 class EzRecordDataset(IndexedRecordDataset):
+    """Deprecated, use IndexedRecordDataset instead"""
+
     def __post_init__(self):
         warnings.warning(
             "EzRecordDataset is deprecated due to name changes, use IndexedRecordDataset instead",

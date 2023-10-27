@@ -1,3 +1,9 @@
+"""This is the module that handles file serialization/deserialization.
+
+Attributes:
+    NO_INPUT (object):
+        Immortal one-time object that is used by the `kurry` function to indicate there is no input.
+"""
 import struct
 import warnings
 from functools import lru_cache, partial, wraps
