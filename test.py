@@ -1,5 +1,6 @@
 import random
 import tempfile
+from os import path, remove
 
 import pytest
 from dsrecords import IndexedRecordDataset, io, make_dataset
@@ -69,11 +70,62 @@ def test_example_list_serializers():
 
 def test_quick_removal():
     # Quick removal
-    name = "quick-remove-test.rec"
-    data_orig = [0, 1, 2, 3, 4, 5]
-    data_new = [0, 1, 2, 5, 4]
+    # Don't test with floating points because they are cursed
+    random.seed(0)
+    n = 10000
+    name = tempfile.NamedTemporaryFile("r+b").name
+
+    data_orig = [random.randint(0, n) for _ in range(n)]
+    idx = random.randint(0, n - 1)
+
+    # For manual checking
+    # data_orig = list(range(8))
+    # idx = [6, 2, 4]
+
+    # Create dataset
     make_dataset([[i] for i in data_orig], name, [io.save_int])
     data = IndexedRecordDataset(name, deserializers=[io.load_int])
-    data.quick_remove_at(3)
-    data_new_2 = [i[0] for i in data]
-    assert all((x == y) for (x, y) in zip(data_new, data_new_2))
+
+    # Remove index
+    for _ in range(n // 2):
+        idx = random.randint(0, n - 1)
+        data.quick_remove_at(idx)
+        if idx == n - 1:
+            data_orig.pop(-1)
+        else:
+            data_orig[idx] = data_orig.pop(-1)
+        n = n - 1
+
+    # Edge index cases
+    data.quick_remove_at(0)
+    data_orig[0] = data_orig.pop(-1)
+    data.quick_remove_at(len(data) - 1)
+    data_orig.pop(len(data_orig) - 1)
+
+    assert all((x[0] == y) for (x, y) in zip(data, data_orig))
+    assert len(data) == len(data_orig)
+
+
+def test_defrag():
+    n = 10000
+    name_1 = tempfile.NamedTemporaryFile("r+b").name
+    name_2 = tempfile.NamedTemporaryFile("r+b").name
+
+    # Create dataset
+    data_orig = [random.randint(0, n) for _ in range(n)]
+    make_dataset([[i] for i in data_orig], name_1, [io.save_float])
+    data = IndexedRecordDataset(name_1, deserializers=[io.load_float])
+
+    # Remove
+    for i in range(n // 2):
+        random.randint(0, n - 1)
+        data.quick_remove_at(i)
+
+    # Truncate
+    data.defrag(name_2)
+    data_defrag = IndexedRecordDataset(name_2, data.deserializers)
+
+    # Obviously we don't want defrag to be useless...
+    assert path.getsize(name_1) > path.getsize(name_2)
+    assert len(data_defrag) == len(data)
+    assert all((x[0] == y[0]) for (x, y) in zip(data, data_defrag))

@@ -1,12 +1,14 @@
 import os
 import struct
 import warnings
+from copy import deepcopy
 from functools import cached_property
 from io import SEEK_END
 from typing import Iterable, List, Optional
 
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
+RESERVED_BYTES = struct.pack("<" + "x" * RESERVED_SPACE)
 
 
 class IndexFile:
@@ -69,8 +71,11 @@ class IndexFile:
             f.truncate()
 
             # Overwrite current offset
-            f.seek(8 * (i + 1))
-            f.write(buffer)
+            # If i is not the last one
+            # no need for swapping
+            if i < n - 1:
+                f.seek(8 * (i + 1))
+                f.write(buffer)
 
             # Reduce length
             f.seek(0)
@@ -96,7 +101,7 @@ def make_dataset(
 
     # Write record file
     with open(output, "wb") as io:
-        io.seek(RESERVED_SPACE)
+        io.write(RESERVED_BYTES)
 
         for items in record_iters:
             # serialize
@@ -142,6 +147,17 @@ class IndexedRecordDataset:
     def quick_remove_at(self, i):
         self.index.quick_remove_at(i)
 
+    def defrag(self, output_file):
+        ref_data = deepcopy(self)
+        ref_data.deserializers = [lambda x: x for _ in self.deserializers]
+        serializers = [lambda x: x for _ in self.deserializers]
+
+        def data_iter():
+            for item in ref_data:
+                yield item
+
+        return make_dataset(data_iter(), output_file, serializers=serializers)
+
     def __iter__(self):
         return iter(self[i] for i in range(len(self)))
 
@@ -150,26 +166,25 @@ class IndexedRecordDataset:
 
     def __getitem__(self, idx: int):
         msg = "You need de-serializers for reading the data"
-        assert self.deserializers is not None, msg
+        deserializers = self.deserializers
+        assert deserializers is not None, msg
 
         # Inputs
         offset = self.index[idx]
-        fns = self.deserializers
         N = self.num_items
 
         # Deserialize
         with open(self.path, "rb") as io:
             io.seek(offset)
             lens = [struct.unpack("<Q", io.read(8))[0] for _ in range(N)]
-            items = [fns[i](io.read(n)) for i, n in enumerate(lens)]
+            items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
 
         return items
 
     def append(self, items):
         if not os.path.isfile(self.path) or len(self) == 0:
             with open(self.path, "wb") as io:
-                fmt = "<" + "b" * RESERVED_SPACE
-                io.write(struct.pack(fmt, *([0] * RESERVED_SPACE)))
+                io.write(RESERVED_BYTES)
 
         msg = "You need serializers for reading the data"
         assert self.serializers is not None, msg
