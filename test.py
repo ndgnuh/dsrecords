@@ -65,3 +65,15 @@ def test_example_list_serializers():
     txt_1 = "\n".join([" ".join(txt) for txt in nested_txt_list_1])
     txt_2 = "\n".join([" ".join(txt) for txt in nested_txt_list_2])
     assert txt_1 == txt_2
+
+
+def test_quick_removal():
+    # Quick removal
+    name = "quick-remove-test.rec"
+    data_orig = [0, 1, 2, 3, 4, 5]
+    data_new = [0, 1, 2, 5, 4]
+    make_dataset([[i] for i in data_orig], name, [io.save_int])
+    data = IndexedRecordDataset(name, deserializers=[io.load_int])
+    data.quick_remove_at(3)
+    data_new_2 = [i[0] for i in data]
+    assert all((x == y) for (x, y) in zip(data_new, data_new_2))

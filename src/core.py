@@ -36,6 +36,10 @@ class IndexFile:
             (offset,) = struct.unpack("<Q", io.read(8))
         return offset
 
+    def __repr__(self):
+        n = len(self)
+        return f"Index file with {n} items"
+
     def append(self, idx):
         n = len(self)
         mode = "wb" if n == 0 else "rb+"
@@ -47,6 +51,39 @@ class IndexFile:
             # Add index
             io.seek(0, SEEK_END)
             io.write(struct.pack("<Q", idx))
+
+    def quick_remove_at(self, i):
+        """Quickly remove an index by writing the index at the end to that index position.
+
+        WARNING: This does not preserve the position of the index.
+
+        Args:
+            i (int): The index to be removed
+        """
+        n = len(self)
+        with open(self.path, "rb+") as f:
+            # Take the offset at the end of the file
+            f.seek(-8, SEEK_END)
+            buffer = f.read(8)
+            f.seek(-8, SEEK_END)
+            f.truncate()
+
+            # Overwrite current offset
+            f.seek(8 * (i + 1))
+            f.write(buffer)
+
+            # Reduce length
+            f.seek(0)
+            f.write(struct.pack("<Q", n - 1))
+
+    def __setitem__(self, i, v):
+        with open(self.path, "rb+") as f:
+            # Overwrite current offset
+            f.seek(8 * (i + 1))
+            f.write(struct.pack("<Q", v))
+
+    def __iter__(self):
+        return (self[i] for i in range(len(self)))
 
 
 def make_dataset(
@@ -101,6 +138,9 @@ class IndexedRecordDataset:
     @cached_property
     def num_items(self):
         return len(self.deserializers)
+
+    def quick_remove_at(self, i):
+        self.index.quick_remove_at(i)
 
     def __iter__(self):
         return iter(self[i] for i in range(len(self)))
