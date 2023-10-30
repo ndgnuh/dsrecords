@@ -4,7 +4,7 @@ import warnings
 from copy import deepcopy
 from functools import cached_property
 from io import SEEK_END
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
@@ -111,8 +111,8 @@ class IndexFile:
             # Overwrite current offset
             # If i is not the last one
             # no need for swapping
-            if i < n - 1:
-                f.seek(8 * (i + 1))
+            if idx < n - 1:
+                f.seek(8 * (idx + 1))
                 f.write(buffer)
 
             # Reduce length
