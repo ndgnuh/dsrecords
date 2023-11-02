@@ -40,6 +40,16 @@ class IndexFile:
     def __init__(self, path: str):
         self.path = path
 
+    def _get_index_offset(self, idx: int):
+        """Get the offset of the data-offset in the index file
+
+        In the current format, it's `(i + 1) * INDEX_SIZE`.
+
+        Args:
+            idx (int): the data index.
+        """
+        return (idx + 1) * INDEX_SIZE
+
     def write(self, offsets: List[int]):
         """Write a list of offsets to the index file.
 
@@ -67,7 +77,7 @@ class IndexFile:
     def __getitem__(self, idx):
         assert idx < len(self)
         with open(self.path, "rb") as io:
-            io.seek((idx + 1) * INDEX_SIZE)
+            io.seek(self._get_index_offset(idx))
             offset = unpack_index(io.read(INDEX_SIZE))
         return offset
 
@@ -124,7 +134,7 @@ class IndexFile:
             # If i is not the last one
             # no need for swapping
             if idx < n - 1:
-                f.seek(INDEX_SIZE * (idx + 1))
+                f.seek(self._get_index_offset(idx))
                 f.write(buffer)
 
             # Reduce length
@@ -134,7 +144,7 @@ class IndexFile:
     def __setitem__(self, i, v):
         with open(self.path, "rb+") as f:
             # Overwrite current offset
-            f.seek(INDEX_SIZE * (i + 1))
+            f.seek(self._get_index_offset(i))
             f.write(pack_index(v))
 
     def __iter__(self):
