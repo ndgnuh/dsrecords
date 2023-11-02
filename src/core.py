@@ -10,6 +10,17 @@ from typing import Iterable, List, Optional, Tuple
 RESERVED_SPACE = 1024
 RESERVED_BYTES = struct.pack("<" + "x" * RESERVED_SPACE)
 INDEX_SIZE = 8
+INDEX_FMT = "<Q"
+
+
+def pack_index(idx: int) -> bytes:
+    """Convert a UInt64 to bytes buffer"""
+    return struct.pack(INDEX_FMT, idx)
+
+
+def unpack_index(idx_bin: bytes) -> int:
+    """Decode a bytes buffer as UInt64"""
+    return struct.unpack(INDEX_FMT, idx_bin)[0]
 
 
 class IndexFile:
@@ -40,9 +51,9 @@ class IndexFile:
         """
         with open(self.path, "wb") as io:
             n = len(offsets)
-            io.write(struct.pack("<Q", n))
+            io.write(pack_index(n))
             for offset in offsets:
-                io.write(struct.pack("<Q", offset))
+                io.write(pack_index(offset))
 
     def __len__(self):
         if not os.path.isfile(self.path):
@@ -50,14 +61,14 @@ class IndexFile:
 
         with open(self.path, "rb") as io:
             io.seek(0)
-            (n,) = struct.unpack("<Q", io.read(INDEX_SIZE))
+            n = unpack_index(io.read(INDEX_SIZE))
         return n
 
     def __getitem__(self, idx):
         assert idx < len(self)
         with open(self.path, "rb") as io:
             io.seek((idx + 1) * INDEX_SIZE)
-            (offset,) = struct.unpack("<Q", io.read(INDEX_SIZE))
+            offset = unpack_index(io.read(INDEX_SIZE))
         return offset
 
     def __repr__(self):
@@ -77,11 +88,11 @@ class IndexFile:
         with open(self.path, mode) as io:
             # Increase length
             io.seek(0)
-            io.write(struct.pack("<Q", n + 1))
+            io.write(pack_index(n + 1))
 
             # Add index
             io.seek(0, SEEK_END)
-            io.write(struct.pack("<Q", offset))
+            io.write(pack_index(offset))
 
     def quick_remove_at(self, idx: int):
         """Quickly remove an index by writing the index at the end to that index position.
@@ -118,13 +129,13 @@ class IndexFile:
 
             # Reduce length
             f.seek(0)
-            f.write(struct.pack("<Q", n - 1))
+            f.write(pack_index(n - 1))
 
     def __setitem__(self, i, v):
         with open(self.path, "rb+") as f:
             # Overwrite current offset
             f.seek(INDEX_SIZE * (i + 1))
-            f.write(struct.pack("<Q", v))
+            f.write(pack_index(v))
 
     def __iter__(self):
         return (self[i] for i in range(len(self)))
@@ -147,7 +158,7 @@ def make_dataset(
             items_bin = [serialize(items[i])
                          for i, serialize in enumerate(serializers)]
             headers = [len(b) for b in items_bin]
-            headers_bin = [struct.pack("<Q", h) for h in headers]
+            headers_bin = [pack_index(h) for h in headers]
 
             # Track global offset, local offset (size)
             indices.append(io.tell())
@@ -248,7 +259,7 @@ class IndexedRecordDataset:
         # Deserialize
         with open(self.path, "rb") as io:
             io.seek(offset)
-            lens = [struct.unpack("<Q", io.read(INDEX_SIZE))[0]
+            lens = [unpack_index(io.read(INDEX_SIZE))
                     for _ in range(N)]
             items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
 
@@ -272,7 +283,7 @@ class IndexedRecordDataset:
             serialize(items[i]) for i, serialize in enumerate(self.serializers)
         ]
         headers = [len(b) for b in items_bin]
-        headers_bin = [struct.pack("<Q", h) for h in headers]
+        headers_bin = [pack_index(h) for h in headers]
         with open(self.path, "a+b") as io:
             io.seek(0, SEEK_END)
             idx = io.tell()
