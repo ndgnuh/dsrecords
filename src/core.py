@@ -9,6 +9,7 @@ from typing import Iterable, List, Optional, Tuple
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
 RESERVED_BYTES = struct.pack("<" + "x" * RESERVED_SPACE)
+INDEX_SIZE = 8
 
 
 class IndexFile:
@@ -49,14 +50,14 @@ class IndexFile:
 
         with open(self.path, "rb") as io:
             io.seek(0)
-            (n,) = struct.unpack("<Q", io.read(8))
+            (n,) = struct.unpack("<Q", io.read(INDEX_SIZE))
         return n
 
     def __getitem__(self, idx):
         assert idx < len(self)
         with open(self.path, "rb") as io:
-            io.seek((idx + 1) * 8)
-            (offset,) = struct.unpack("<Q", io.read(8))
+            io.seek((idx + 1) * INDEX_SIZE)
+            (offset,) = struct.unpack("<Q", io.read(INDEX_SIZE))
         return offset
 
     def __repr__(self):
@@ -103,16 +104,16 @@ class IndexFile:
         n = len(self)
         with open(self.path, "rb+") as f:
             # Take the offset at the end of the file
-            f.seek(-8, SEEK_END)
-            buffer = f.read(8)
-            f.seek(-8, SEEK_END)
+            f.seek(-INDEX_SIZE, SEEK_END)
+            buffer = f.read(INDEX_SIZE)
+            f.seek(-INDEX_SIZE, SEEK_END)
             f.truncate()
 
             # Overwrite current offset
             # If i is not the last one
             # no need for swapping
             if idx < n - 1:
-                f.seek(8 * (idx + 1))
+                f.seek(INDEX_SIZE * (idx + 1))
                 f.write(buffer)
 
             # Reduce length
@@ -122,7 +123,7 @@ class IndexFile:
     def __setitem__(self, i, v):
         with open(self.path, "rb+") as f:
             # Overwrite current offset
-            f.seek(8 * (i + 1))
+            f.seek(INDEX_SIZE * (i + 1))
             f.write(struct.pack("<Q", v))
 
     def __iter__(self):
@@ -143,7 +144,8 @@ def make_dataset(
 
         for items in record_iters:
             # serialize
-            items_bin = [serialize(items[i]) for i, serialize in enumerate(serializers)]
+            items_bin = [serialize(items[i])
+                         for i, serialize in enumerate(serializers)]
             headers = [len(b) for b in items_bin]
             headers_bin = [struct.pack("<Q", h) for h in headers]
 
@@ -246,7 +248,8 @@ class IndexedRecordDataset:
         # Deserialize
         with open(self.path, "rb") as io:
             io.seek(offset)
-            lens = [struct.unpack("<Q", io.read(8))[0] for _ in range(N)]
+            lens = [struct.unpack("<Q", io.read(INDEX_SIZE))[0]
+                    for _ in range(N)]
             items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
 
         return items
