@@ -118,6 +118,42 @@ def test_quick_removal():
         assert x[0] == y
 
 
+def test_remove_and_trim():
+    n = 100
+    name_1 = tmpfile()
+    name_2 = tmpfile(suffix=".idx")
+    random.seed(0)
+    num_removal = n // 5
+
+    # Create dataset
+    lst_1 = [random.randint(0, n) for _ in range(n)]
+    data = IndexedRecordDataset(
+        name_1,
+        create=True,
+        serializers=[io.save_int],
+        deserializers=[io.load_int],
+    )
+    for num in lst_1:
+        data.append([num])
+    for i, x in enumerate(lst_1):
+        assert data[i][0] == x
+
+    # Remove
+    for i in range(num_removal):
+        n = len(lst_1) - 1
+        try:
+            idx = [0, 0, n - 2, 1, n - 1, n][i]
+        except Exception:
+            idx = random.randint(0, n)
+        lst_1.pop(idx)
+        data.index.remove_at(idx)
+        data.index.trim(name_2, replace=True)
+        assert len(data) == len(lst_1)
+
+    for x, y in zip(data, lst_1):
+        assert x[0] == y
+
+
 def test_defrag():
     n = 10000
     name_1 = tempfile.NamedTemporaryFile("r+b").name

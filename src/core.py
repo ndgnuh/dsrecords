@@ -3,7 +3,7 @@ import struct
 import warnings
 from copy import deepcopy
 from functools import cached_property
-from io import SEEK_END
+from io import SEEK_CUR, SEEK_END
 from pathlib import Path
 from shutil import move
 from typing import Dict, Iterable, List, Optional, Tuple, Union
@@ -143,11 +143,15 @@ class IndexFile:
             n = unpack_index(io.read(INDEX_SIZE))
         return n
 
-    def _remove_last(self):
+    def _remove_last(self, idx):
         n = len(self)
         with open(self.path, "rb+") as f:
-            # Just reduce length
             # Do not truncate the file because there are backswapped stuff
+            # Write zeros so that it is not included in the backswap
+            f.seek(self._get_index_offset(n - 1))
+            f.write(pack_index(0))
+
+            # Just reduce length
             f.seek(0)
             f.write(pack_index(n - 1))
 
@@ -179,11 +183,12 @@ class IndexFile:
             idx (int): the index to be deleted.
         """
         n = len(self)
+        assert idx < n and idx >= 0
         # TODO: remove with truncation
         if idx == n - 1:
-            self._remove_last()
+            offset_bin = self._remove_last(idx)
         else:
-            self._remove_with_backswap(idx)
+            offset_bin = self._remove_with_backswap(idx)
 
     def get_backswap_offsets(self) -> Dict[int, int]:
         """Return list of offsets that are backswapped during deletion
@@ -194,6 +199,7 @@ class IndexFile:
                 and the values are the index of those offsets.
         """
         n = len(self)
+        offsets = []
         with open(self.path, "rb") as f:
             # Retrieve information
             a = self._get_index_offset(n)
@@ -202,12 +208,13 @@ class IndexFile:
             f.seek(a)
 
             # Retrieve indices
-            removed_idx = {}
             for i in range(num_removed):
                 idx = n + i
                 offset = unpack_index(f.read(INDEX_SIZE))
-                removed_idx[offset] = idx
-        return removed_idx
+                if offset != 0:
+                    offsets.append(offset)
+        offsets = sorted(offsets)
+        return offsets
 
     def trim(self, output_file: str, replace: bool = False):
         """Truncate the index file, remove backswap bytes and restore order to the index file.
@@ -219,26 +226,28 @@ class IndexFile:
                 If replace is true, the output file will be moved to the current index file
                 on the disk. Default: false.
         """
-        backswapped = self.get_backswap_offsets()
         n = len(self)
+        bs_offsets = self.get_backswap_offsets()
+
+        # Filter out deleted index
+        bs_maps = {offset: i for i, offset in enumerate(bs_offsets)}
+        bs_offsets = []
 
         # Select which file to copy to
         new_file = IndexFile(output_file, create=True)
         for i in range(n):
             offset = self[i]
             # Skip back swapped index
-            if offset in backswapped:
+            if offset in bs_maps:
+                bs_offsets.append(offset)
                 continue
 
             # Add index
             new_file.append(offset)
 
         # Add backswapped offsets
-        bs_indices = sorted(list(backswapped.values()))
-        offset_by_idx = {v: k for k, v in backswapped.items()}
-        for idx in bs_indices:
-            new_file.append(offset_by_idx[idx])
-
+        for offset in bs_offsets:
+            new_file.append(offset)
         # Replace
         if replace:
             move(output_file, self.path)
