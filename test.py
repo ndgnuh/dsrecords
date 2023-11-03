@@ -1,9 +1,20 @@
 import random
+import string
 import tempfile
 from os import path, remove
 
 import pytest
 from dsrecords import IndexedRecordDataset, io, make_dataset
+
+tempdir = tempfile.TemporaryDirectory()
+
+
+def tmpfile(suffix=".rec") -> str:
+    rand_string = random.choices(string.ascii_uppercase + string.digits, k=10)
+    rand_string = "".join(rand_string)
+    rand_string = f"{rand_string}{suffix}"
+    return path.join(tempdir.name, rand_string)
+
 
 save_uint32 = io.save_int(bits=32, signed=False)
 load_uint32 = io.load_int(bits=32, signed=False)
@@ -14,19 +25,19 @@ def test_append_vs_create():
     serializers = [save_uint32]
 
     # first write
-    file_a = tempfile.NamedTemporaryFile("r+b")
-    _, index_a = make_dataset(dataset, file_a.name, serializers)
+    file_a = tmpfile()
+    _, index_a = make_dataset(dataset, file_a, serializers)
 
     # second write
-    file_b = tempfile.NamedTemporaryFile("r+b")
-    data = IndexedRecordDataset(file_b.name, serializers=serializers)
+    file_b = tmpfile()
+    data = IndexedRecordDataset(file_b, serializers=serializers, create=True)
     index_b = data.index.path
     for sample in dataset:
         data.append(sample)
 
     # Check
-    with open(file_a.name, "rb") as f_a:
-        with open(file_b.name, "rb") as f_b:
+    with open(file_a, "rb") as f_a:
+        with open(file_b, "rb") as f_b:
             assert f_a.read() == f_b.read()
     with open(index_a, "rb") as f_a:
         with open(index_b, "rb") as f_b:
@@ -73,7 +84,7 @@ def test_quick_removal():
     # Don't test with floating points because they are cursed
     random.seed(0)
     n = 10000
-    name = tempfile.NamedTemporaryFile("r+b").name
+    name = tmpfile()
 
     data_orig = [random.randint(0, n) for _ in range(n)]
     idx = random.randint(0, n - 1)

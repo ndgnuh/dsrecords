@@ -216,31 +216,20 @@ def make_dataset(
     index_path: Optional[str] = None,
 ):
     indices = []
-
+    data = IndexedRecordDataset(
+        output,
+        index_path,
+        create=True,
+        serializers=serializers,
+    )
     # Write record file
-    with open(output, "wb") as io:
-        io.write(RESERVED_BYTES)
+    for items in record_iters:
+        data.append(items)
 
-        for items in record_iters:
-            # serialize
-            items_bin = [serialize(items[i]) for i, serialize in enumerate(serializers)]
-            headers = [len(b) for b in items_bin]
-            headers_bin = [pack_index(h) for h in headers]
-
-            # Track global offset, local offset (size)
-            indices.append(io.tell())
-
-            # Write
-            for h in headers_bin:
-                io.write(h)
-            for d in items_bin:
-                io.write(d)
-
-    # Write indice files
-    if index_path is None:
-        index_path = os.path.splitext(output)[0] + ".idx"
-    IndexFile(index_path).write(indices)
-    return output, index_path
+    # Return the paths
+    data_path = data.path
+    index_path = data.index.path
+    return data_path, index_path
 
 
 class IndexedRecordDataset:
