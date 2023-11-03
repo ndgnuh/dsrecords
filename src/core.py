@@ -5,7 +5,8 @@ from copy import deepcopy
 from functools import cached_property
 from io import SEEK_END
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Union
+from shutil import move
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
@@ -183,6 +184,64 @@ class IndexFile:
             self._remove_last()
         else:
             self._remove_with_backswap(idx)
+
+    def get_backswap_offsets(self) -> Dict[int, int]:
+        """Return list of offsets that are backswapped during deletion
+
+        Returns:
+            backswap (Dict[int, int]):
+                The dict with the keys are the backswapped offsets,
+                and the values are the index of those offsets.
+        """
+        n = len(self)
+        with open(self.path, "rb") as f:
+            # Retrieve information
+            a = self._get_index_offset(n)
+            b = f.seek(0, SEEK_END)
+            num_removed = (b - a) // INDEX_SIZE
+            f.seek(a)
+
+            # Retrieve indices
+            removed_idx = {}
+            for i in range(num_removed):
+                idx = n + i
+                offset = unpack_index(f.read(INDEX_SIZE))
+                removed_idx[offset] = idx
+        return removed_idx
+
+    def trim(self, output_file: str, replace: bool = False):
+        """Truncate the index file, remove backswap bytes and restore order to the index file.
+
+        Args:
+            output_file (Optional[str]):
+                The output index file. Must not be an existing path.
+            replace (bool):
+                If replace is true, the output file will be moved to the current index file
+                on the disk. Default: false.
+        """
+        backswapped = self.get_backswap_offsets()
+        n = len(self)
+
+        # Select which file to copy to
+        new_file = IndexFile(output_file, create=True)
+        for i in range(n):
+            offset = self[i]
+            # Skip back swapped index
+            if offset in backswapped:
+                continue
+
+            # Add index
+            new_file.append(offset)
+
+        # Add backswapped offsets
+        bs_indices = sorted(list(backswapped.values()))
+        offset_by_idx = {v: k for k, v in backswapped.items()}
+        for idx in bs_indices:
+            new_file.append(offset_by_idx[idx])
+
+        # Replace
+        if replace:
+            move(output_file, self.path)
 
     def quick_remove_at(self, idx: int):
         """Deprecated, use `remove_at`"""
