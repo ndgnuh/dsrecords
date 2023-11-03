@@ -142,6 +142,52 @@ class IndexFile:
             n = unpack_index(io.read(INDEX_SIZE))
         return n
 
+    def _remove_last(self):
+        n = len(self)
+        with open(self.path, "rb+") as f:
+            # Just reduce length
+            # Do not truncate the file because there are backswapped stuff
+            f.seek(0)
+            f.write(pack_index(n - 1))
+
+    def _remove_with_backswap(self, idx: int):
+        n = len(self)
+        with open(self.path, "rb+") as f:
+            # | n | i_0 | i_1 | ... i_(n-2) >|< i_(n-1) |
+            back_offset = self._get_index_offset(n - 1)
+            f.seek(back_offset)
+            back_bin = f.read(INDEX_SIZE)
+
+            # Swap
+            cur_offset = self._get_index_offset(idx)
+            f.seek(cur_offset)
+            f.write(back_bin)
+
+            # Reduce length
+            f.seek(0)
+            f.write(pack_index(n - 1))
+
+    def remove_at(self, idx: int):
+        """Remove data offset at some index.
+
+        !!! warning "This function change the order of the records"
+            Since the removal use backswapping, the record at the back will be swapped to the deletion index.
+            To restore the order, trim the index file using `trim`.
+
+        Args:
+            idx (int): the index to be deleted.
+        """
+        n = len(self)
+        # TODO: remove with truncation
+        if idx == n - 1:
+            self._remove_last()
+        else:
+            self._remove_with_backswap(idx)
+
+    def quick_remove_at(self, idx: int):
+        """Deprecated, use `remove_at`"""
+        self.remove_at(idx)
+
     def __getitem__(self, idx):
         assert idx < len(self)
         with open(self.path, "rb") as io:
@@ -171,43 +217,6 @@ class IndexFile:
             # Add index
             io.seek(0, SEEK_END)
             io.write(pack_index(offset))
-
-    def quick_remove_at(self, idx: int):
-        """Quickly remove an index by writing the index at the end to that index position.
-
-        Conceptually, this operation do:
-        ```python
-        offsets[idx] = offsets.pop(-1)
-        ```
-
-        !!! warning "This operation does not preserve the position of the index"
-            For example, the offset values `[0, 8, 16, 24, 32]` will be come `[0, 8, 32, 24]` if we remove the index `2`.
-
-        To actually preserve the order, we would have to offset the
-        content of the whole index file to the left, which is not
-        cheap at all.
-
-        Args:
-            idx (int): The index to be removed
-        """
-        n = len(self)
-        with open(self.path, "rb+") as f:
-            # Take the offset at the end of the file
-            f.seek(-INDEX_SIZE, SEEK_END)
-            buffer = f.read(INDEX_SIZE)
-            f.seek(-INDEX_SIZE, SEEK_END)
-            f.truncate()
-
-            # Overwrite current offset
-            # If i is not the last one
-            # no need for swapping
-            if idx < n - 1:
-                f.seek(self._get_index_offset(idx))
-                f.write(buffer)
-
-            # Reduce length
-            f.seek(0)
-            f.write(pack_index(n - 1))
 
     def __setitem__(self, i, v):
         with open(self.path, "rb+") as f:
@@ -295,8 +304,8 @@ class IndexedRecordDataset:
         return len(self.deserializers)
 
     def quick_remove_at(self, idx):
-        """Just a wrapper for `IndexFile.quick_remove_at`."""
-        self.index.quick_remove_at(idx)
+        """Just a wrapper for `IndexFile.remove_at`."""
+        self.index.remove_at(idx)
 
     def defrag(self, output_file: str):
         """Defragment the dataset.

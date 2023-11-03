@@ -113,8 +113,9 @@ def test_quick_removal():
     data.quick_remove_at(len(data) - 1)
     data_orig.pop(len(data_orig) - 1)
 
-    assert all((x[0] == y) for (x, y) in zip(data, data_orig))
     assert len(data) == len(data_orig)
+    for x, y in zip(data, data_orig):
+        assert x[0] == y
 
 
 def test_defrag():
