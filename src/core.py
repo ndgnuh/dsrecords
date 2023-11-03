@@ -4,13 +4,73 @@ import warnings
 from copy import deepcopy
 from functools import cached_property
 from io import SEEK_END
-from typing import Iterable, List, Optional, Tuple
+from pathlib import Path
+from typing import Iterable, List, Optional, Tuple, Union
 
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
 RESERVED_BYTES = struct.pack("<" + "x" * RESERVED_SPACE)
 INDEX_SIZE = 8
 INDEX_FMT = "<Q"
+
+
+def init_index_file(output_path: str):
+    """Create an "empty" index file
+
+    Args:
+        output_path (Union[str, Path]):
+            Path to output index file, must not exists.
+    """
+    msg = f"The file {output_path} already exists"
+    assert not os.path.exists(output_path), msg
+    with open(output_path, "wb") as f:
+        f.write(pack_index(0))
+    return output_path
+
+
+def init_data_file(output_path: Union[str, Path]):
+    """Create an "empty" data file
+
+    Args:
+        output_path (Union[str, Path]):
+            Path to output dataset file, must not exists.
+    """
+    msg = f"The file {output_path} already exists"
+    assert not os.path.exists(output_path), msg
+    with open(output_path, "wb") as f:
+        f.write(RESERVED_BYTES)
+    return output_path
+
+
+def init_dataset(dataset_path: str, index_path: Optional[str] = None):
+    """Create an empty dataset, include one data file and one index file.
+
+    Args:
+        dataset_path (Union[str, Path]):
+            Path to output dataset file, must not exists.
+        index_path (Union[str, Path, NoneType]):
+            Path to output dataset file, must not exists.
+            If is set to `None`, it will be determined by replacing the extension of
+            dataset path with `.idx`.
+            Default: `None`.
+    """
+    # Default index file
+    if index_path is None:
+        index_path = f"{os.path.splitext(dataset_path)[0]}.idx"
+
+    # Name clash
+    msg = "Name clash, dataset path should end with '.rec' extension, not '.idx'"
+    assert index_path != dataset_path, msg
+
+    # Create empty files
+    init_index_file(index_path)
+    init_data_file(dataset_path)
+    return dataset_path, index_path
+
+
+def pack_index(idx: int) -> bytes:
+    """Convert a UInt64 to bytes buffer"""
+    return struct.pack(INDEX_FMT, idx)
 
 
 def pack_index(idx: int) -> bytes:
@@ -31,13 +91,24 @@ class IndexFile:
 
     Args:
         path (str):
-            Path to the index file. Does not need to exist.
+            Path to the index file.
+        create (bool):
+            Whether to create the a new index file.
+            If true, the path must not exists.
+            If false, the path must exists.
+            Default: false.
 
     Attributes:
         path (str): Path to the physical index file.
     """
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, create: bool = False):
+        exists = os.path.exists(path)
+        if create:
+            init_index_file(path)
+        else:
+            msg = f"The file {path} does not exists, to create a new one, use `create = true`"
+            assert exists, msg
         self.path = path
 
     def write(self, offsets: List[int]):
@@ -56,9 +127,6 @@ class IndexFile:
                 io.write(pack_index(offset))
 
     def __len__(self):
-        if not os.path.isfile(self.path):
-            return 0
-
         with open(self.path, "rb") as io:
             io.seek(0)
             n = unpack_index(io.read(INDEX_SIZE))
@@ -155,8 +223,7 @@ def make_dataset(
 
         for items in record_iters:
             # serialize
-            items_bin = [serialize(items[i])
-                         for i, serialize in enumerate(serializers)]
+            items_bin = [serialize(items[i]) for i, serialize in enumerate(serializers)]
             headers = [len(b) for b in items_bin]
             headers_bin = [pack_index(h) for h in headers]
 
@@ -195,6 +262,12 @@ class IndexedRecordDataset:
             For convenience, dataset file and index file normally
             have the same basename, only their extension are different.
             Default: `None`.
+        create (bool):
+            If create is true, attempt to create the dataset file and the index file.
+            If not, simply use the existing files.
+            In create mode, dataset file and index file must not exist.
+            In normal mode, dataset file and index file must exist.
+            Defaut: false.
     """
 
     def __init__(
@@ -203,9 +276,15 @@ class IndexedRecordDataset:
         deserializers: Optional[List] = None,
         serializers: Optional[List] = None,
         index_path: Optional[str] = None,
+        create: bool = False,
     ):
         if index_path is None:
             index_path = os.path.splitext(path)[0] + ".idx"
+        if create:
+            init_dataset(path, index_path)
+        else:
+            msg = f"Data file {path} does not exist, use `create = True` to create one"
+            assert os.path.exists(path), msg
         self.path = path
         self.deserializers = deserializers
         self.serializers = serializers
@@ -259,8 +338,7 @@ class IndexedRecordDataset:
         # Deserialize
         with open(self.path, "rb") as io:
             io.seek(offset)
-            lens = [unpack_index(io.read(INDEX_SIZE))
-                    for _ in range(N)]
+            lens = [unpack_index(io.read(INDEX_SIZE)) for _ in range(N)]
             items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
 
         return items
