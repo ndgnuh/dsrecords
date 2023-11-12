@@ -257,7 +257,6 @@ class IndexFile:
         self.remove_at(idx)
 
     def __getitem__(self, idx):
-        assert idx < len(self)
         with open(self.path, "rb") as io:
             io.seek(self._get_index_offset(idx))
             offset = unpack_index(io.read(INDEX_SIZE))
@@ -397,17 +396,26 @@ class IndexedRecordDataset:
 
     def __iter__(self):
         """Iterate through this dataset"""
-        return iter(self[i] for i in range(len(self)))
+        # first_offset = self.index[0]
+        # length = len(self)
+        # deserializers = self.deserializers
+        # N = self.num_items
+        # with open(self.path, "rb") as io:
+        #     io.seek(first_offset)
+        #     for _ in range(length):
+        #         lens = [unpack_index(io.read(INDEX_SIZE)) for _ in range(N)]
+        #         items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
+        #         yield items
+        # <- Not thread safe
+        N = len(self)
+        return (self[i] for i in range(N))
 
     def __len__(self):
         return len(self.index)
 
     def __getitem__(self, idx: int):
-        msg = "You need de-serializers for reading the data"
-        deserializers = self.deserializers
-        assert deserializers is not None, msg
-
         # Inputs
+        deserializers = self.deserializers
         offset = self.index[idx]
         N = self.num_items
 
