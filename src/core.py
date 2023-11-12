@@ -6,7 +6,7 @@ from functools import cached_property
 from io import SEEK_CUR, SEEK_END
 from pathlib import Path
 from shutil import move
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
@@ -352,6 +352,7 @@ class IndexedRecordDataset:
         serializers: Optional[List] = None,
         index_path: Optional[str] = None,
         create: bool = False,
+        transform: Optional[Callable] = None,
     ):
         if index_path is None:
             index_path = os.path.splitext(path)[0] + ".idx"
@@ -364,6 +365,7 @@ class IndexedRecordDataset:
         self.deserializers = deserializers
         self.serializers = serializers
         self.index = IndexFile(index_path)
+        self.transform = transform
 
     @cached_property
     def num_items(self):
@@ -416,6 +418,7 @@ class IndexedRecordDataset:
     def __getitem__(self, idx: int):
         # Inputs
         deserializers = self.deserializers
+        transform = self.transform
         offset = self.index[idx]
         N = self.num_items
 
@@ -425,7 +428,10 @@ class IndexedRecordDataset:
             lens = [unpack_index(io.read(INDEX_SIZE)) for _ in range(N)]
             items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
 
-        return items
+        if transform is not None:
+            return transform(*items)
+        else:
+            return items
 
     def append(self, items: Tuple):
         """Append new items to the dataset.
