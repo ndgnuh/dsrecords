@@ -15,6 +15,7 @@
 ::: io.save_raw_file
 ::: io.save_pil
 ::: io.save_np
+::: io.save_cv2
 
 ## Built-in deserializers
 
@@ -25,6 +26,7 @@
 ::: io.load_str
 ::: io.load_pil
 ::: io.load_np
+::: io.load_cv2
 
 ## List (de)serializers
 
