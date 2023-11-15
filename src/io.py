@@ -298,7 +298,7 @@ def load_list(data, load_fn):
 
 
 @kurry
-def cv2_save(image, ext: str, flags: Optional[List] = None) -> bytes:
+def save_cv2(image, ext: str, flags: Optional[List] = None) -> bytes:
     """Use `cv2.imencode` to encode image to bytes.
 
     Args:
@@ -319,7 +319,8 @@ def cv2_save(image, ext: str, flags: Optional[List] = None) -> bytes:
     return buf.tobytes()
 
 
-def cv2_load(image_bin: bytes, flags: Optional[List] = None):
+@kurry
+def load_cv2(image_bin: bytes, flags: Optional[List] = None):
     """Use `cv2.imdecode` to decode image from bytes.
 
     Args:
