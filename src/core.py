@@ -6,7 +6,7 @@ from functools import cached_property
 from io import SEEK_CUR, SEEK_END
 from pathlib import Path
 from shutil import move
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 # Reserve for whatever changes in the future
 RESERVED_SPACE = 1024
@@ -257,7 +257,6 @@ class IndexFile:
         self.remove_at(idx)
 
     def __getitem__(self, idx):
-        assert idx < len(self)
         with open(self.path, "rb") as io:
             io.seek(self._get_index_offset(idx))
             offset = unpack_index(io.read(INDEX_SIZE))
@@ -353,6 +352,7 @@ class IndexedRecordDataset:
         serializers: Optional[List] = None,
         index_path: Optional[str] = None,
         create: bool = False,
+        transform: Optional[Callable] = None,
     ):
         if index_path is None:
             index_path = os.path.splitext(path)[0] + ".idx"
@@ -365,6 +365,7 @@ class IndexedRecordDataset:
         self.deserializers = deserializers
         self.serializers = serializers
         self.index = IndexFile(index_path)
+        self.transform = transform
 
     @cached_property
     def num_items(self):
@@ -397,17 +398,27 @@ class IndexedRecordDataset:
 
     def __iter__(self):
         """Iterate through this dataset"""
-        return iter(self[i] for i in range(len(self)))
+        # first_offset = self.index[0]
+        # length = len(self)
+        # deserializers = self.deserializers
+        # N = self.num_items
+        # with open(self.path, "rb") as io:
+        #     io.seek(first_offset)
+        #     for _ in range(length):
+        #         lens = [unpack_index(io.read(INDEX_SIZE)) for _ in range(N)]
+        #         items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
+        #         yield items
+        # <- Not thread safe
+        N = len(self)
+        return (self[i] for i in range(N))
 
     def __len__(self):
         return len(self.index)
 
     def __getitem__(self, idx: int):
-        msg = "You need de-serializers for reading the data"
-        deserializers = self.deserializers
-        assert deserializers is not None, msg
-
         # Inputs
+        deserializers = self.deserializers
+        transform = self.transform
         offset = self.index[idx]
         N = self.num_items
 
@@ -417,7 +428,10 @@ class IndexedRecordDataset:
             lens = [unpack_index(io.read(INDEX_SIZE)) for _ in range(N)]
             items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
 
-        return items
+        if transform is not None:
+            return transform(*items)
+        else:
+            return items
 
     def append(self, items: Tuple):
         """Append new items to the dataset.
