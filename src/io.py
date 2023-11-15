@@ -8,7 +8,7 @@ import struct
 import warnings
 from functools import lru_cache, partial, wraps
 from io import BytesIO
-from typing import Callable, List, TypeVar
+from typing import Callable, List, Optional, TypeVar
 
 T = TypeVar("T")
 NO_INPUT = object()
@@ -295,6 +295,46 @@ def load_list(data, load_fn):
         (length,) = struct.unpack("<L", f.read(4))
         outputs = [wrapped_deserializer(f) for _ in range(length)]
     return outputs
+
+
+@kurry
+def cv2_save(image, ext: str, flags: Optional[List] = None) -> bytes:
+    """Use `cv2.imencode` to encode image to bytes.
+
+    Args:
+        image (np.ndarray): An image in np.ndarray format.
+        ext (str): Image extension, there is no default.
+        flags (Optional[List]): List of flags for `cv2.imencode`, default is `[]`.
+
+    Example:
+        ```python
+        serialize = cv2_save(ext='.jpeg')
+        serialize(np.random.rand(300, 300, 3).astype('float32'))
+        ```
+    """
+    import cv2
+
+    flags = [] if flags is None else flags
+    _, buf = cv2.imencode(ext, image)
+    return buf.tobytes()
+
+
+def cv2_load(image_bin: bytes, flags: Optional[List] = None):
+    """Use `cv2.imdecode` to decode image from bytes.
+
+    Args:
+        image_bin (bytes): Image data as bytes.
+        flags: flags for `cv2.imread`, default to `cv2.IMREAD_UNCHANGED`.
+    """
+    import cv2
+    import numpy as np
+
+    if flags is None:
+        flags = cv2.IMREAD_UNCHANGED
+
+    image_bin = np.frombuffer(image_bin, np.uint8)
+    image = cv2.imdecode(image_bin, flags)
+    return image
 
 
 # Deprecated serializers
