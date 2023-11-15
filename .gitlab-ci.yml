@@ -16,7 +16,7 @@ pages:
     stage: docs
     image: python:3.11-slim-bookworm
     script:
-        - pip install mkdocs mkdocstrings mkdocstrings-python pymdown-extensions black
+        - pip install -r requirements.txt
         - mkdocs build --site-dir public
     rules:
         - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/ || $CI_COMMIT_MESSAGE =~ /\[docs\]/

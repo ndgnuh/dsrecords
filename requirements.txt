@@ -1,0 +1,6 @@
+pytest
+mkdocs
+mkdocstrings
+mkdocstrings-python
+pymdown-extensions
+black
