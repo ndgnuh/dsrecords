@@ -458,21 +458,36 @@ class IndexedRecordDataset:
         # +-------------+
         deserializers = self.deserializers
         transform = self.transform
-        offset = self.index[idx]
         N = self.num_items
 
         # +-------------+
         # | Deserialize |
         # +-------------+
-        with open(self.path, "rb") as io:
-            io.seek(offset)
-            lens = unpack_headers_(io, N)
-            items = unpack_data_(io, lens, self.deserializers)
-
-        if transform is not None:
-            return transform(*items)
-        else:
+        if isinstance(idx, int):
+            # +---------------+
+            # | Full row data |
+            # +---------------+
+            offset = self.index[idx]
+            with open(self.path, "rb") as io:
+                io.seek(offset)
+                lens = unpack_headers_(io, N)
+                items = unpack_data_(io, lens, self.deserializers)
             return items
+        else:
+            # +-----------------------------+
+            # | Partial mode, single column |
+            # +-----------------------------+
+            row_idx, col_idx = idx
+            offset = self.index[row_idx]
+            with open(self.path, "rb") as io:
+                io.seek(offset)
+                lens = unpack_headers_(io, N)
+                i = 0
+                for i in range(col_idx):
+                    io.read(lens[i])
+                data_bin = io.read(lens[col_idx])
+                data = deserializers[col_idx](data_bin)
+            return data
 
     def __setitem__(self, k, v):
         """Update data sample at some index.
@@ -497,7 +512,7 @@ class IndexedRecordDataset:
         # | Case1: The update is smaller than current data |
         # +------------------------------------------------+
         def case_inplace(io):
-            print("Case inplace")
+            # print("Case inplace")
             io.seek(offset)
             io.write(update_bin)
 
@@ -505,7 +520,7 @@ class IndexedRecordDataset:
         # | Case2: The item is at the end |
         # +-------------------------------+
         def case_truncate(io):
-            print("Case truncate")
+            # print("Case truncate")
             io.seek(offset)
             io.truncate()
             io.write(update_bin)
@@ -514,7 +529,7 @@ class IndexedRecordDataset:
         # | Case 3: Generic, append to end |
         # +--------------------------------+
         def case_fallback(io):
-            print("Case fallback")
+            # print("Case fallback")
             io.seek(0, SEEK_END)
             new_offset = io.tell()
             io.write(update_bin)

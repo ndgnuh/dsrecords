@@ -4,6 +4,7 @@ import tempfile
 from os import path, remove
 
 import pytest
+
 from dsrecords import IndexedRecordDataset, io, make_dataset
 
 tempdir = tempfile.TemporaryDirectory()
@@ -162,7 +163,9 @@ def test_defrag():
     # Create dataset
     data_orig = [random.randint(0, n) for _ in range(n)]
     make_dataset([[i] for i in data_orig], name_1, [io.save_float])
-    data = IndexedRecordDataset(name_1, serializers=[io.save_float], deserializers=[io.load_float])
+    data = IndexedRecordDataset(
+        name_1, serializers=[io.save_float], deserializers=[io.load_float]
+    )
 
     # Remove
     for i in range(n // 2):
@@ -183,3 +186,36 @@ def test_defrag():
     assert path.getsize(name_1) > path.getsize(name_2)
     assert len(data_defrag) == len(data)
     assert all((x[0] == y[0]) for (x, y) in zip(data, data_defrag))
+
+
+def test_partial_take():
+    # +----------------+
+    # | Create dataset |
+    # +----------------+
+    name = tmpfile(".rec")
+    data = IndexedRecordDataset(
+        name,
+        create=True,
+        serializers=[io.save_int] * 3,
+        deserializers=[io.load_int] * 3,
+    )
+
+    # +--------------------+
+    # | Fill with triplets |
+    # +--------------------+
+    data_raw = []
+    n = 10_000
+    for i in range(n):
+        a = random.randint(0, n)
+        b = random.randint(0, n)
+        c = random.randint(0, n)
+        data.append([a, b, c])
+        data_raw.append([a, b, c])
+
+    # +-----------------------------+
+    # | Check each sample's column  |
+    # +-----------------------------+
+    for i in range(n):
+        for j in range(3):
+            assert data_raw[i][j] == data[i, j]
+
