@@ -162,12 +162,18 @@ def test_defrag():
     # Create dataset
     data_orig = [random.randint(0, n) for _ in range(n)]
     make_dataset([[i] for i in data_orig], name_1, [io.save_float])
-    data = IndexedRecordDataset(name_1, deserializers=[io.load_float])
+    data = IndexedRecordDataset(name_1, serializers=[io.save_float], deserializers=[io.load_float])
 
     # Remove
     for i in range(n // 2):
         random.randint(0, n - 1)
         data.quick_remove_at(i)
+
+    # Update
+    for i in range(100):
+        v = random.randint(0, n)
+        data[i] = [v]
+        data_orig[i] = v
 
     # Truncate
     data.defrag(name_2)

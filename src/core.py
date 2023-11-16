@@ -84,6 +84,42 @@ def unpack_index(idx_bin: bytes) -> int:
     return struct.unpack(INDEX_FMT, idx_bin)[0]
 
 
+def pack_data(items: Tuple, serializers: List) -> bytes:
+    """Serialize data to bytes with header and such
+
+    Args:
+        items (Tuple): Tuple of items.
+        serializers (List[Callable]): List of serialize function.
+    """
+    iter_ = enumerate(items)
+    items_bin = [serializers[i](item) for i, item in iter_]
+    headers = [pack_index(len(b)) for b in items_bin]
+    outputs = b"".join(headers + items_bin)
+    return outputs
+
+
+def unpack_headers_(io, n: int) -> List[int]:
+    """Unpack headers from data. This function change the file pointer.
+
+    Args:
+        io: The file object
+        n (int): Number of header items
+    """
+    return [unpack_index(io.read(INDEX_SIZE)) for i in range(n)]
+
+
+def unpack_data_(io, headers: List[int], deserializers: List):
+    """Deserialize data from io. This function change the file pointer.
+
+    Args:
+        io (File): The file object.
+        headers (List[int]): List of item size.
+        deserializers (List[Callable]): List of deserialize functions.
+    """
+    items = [deserializers[i](io.read(h)) for i, h in enumerate(headers)]
+    return items
+
+
 class IndexFile:
     """File object to interact with index file.
 
@@ -416,22 +452,93 @@ class IndexedRecordDataset:
         return len(self.index)
 
     def __getitem__(self, idx: int):
-        # Inputs
+        """Get data item"""
+        # +-------------+
+        # | Preparation |
+        # +-------------+
         deserializers = self.deserializers
         transform = self.transform
         offset = self.index[idx]
         N = self.num_items
 
-        # Deserialize
+        # +-------------+
+        # | Deserialize |
+        # +-------------+
         with open(self.path, "rb") as io:
             io.seek(offset)
-            lens = [unpack_index(io.read(INDEX_SIZE)) for _ in range(N)]
-            items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
+            lens = unpack_headers_(io, N)
+            items = unpack_data_(io, lens, self.deserializers)
 
         if transform is not None:
             return transform(*items)
         else:
             return items
+
+    def __setitem__(self, k, v):
+        """Update data sample at some index.
+
+        For now, this function just append the item to the end of the dataset
+        and set the index to that offset.
+        In one special case when the data is located at the end, overwrite the data
+        without appending.
+        In another special case when the update is smaller than the data, overwrite
+        the data inplace.
+        """
+        # +---------+
+        # | Prepare |
+        # +---------+
+        last_bytes = os.path.getsize(self.path)
+        offset = self.index[k]
+        N = self.num_items
+        update_bin = pack_data(v, self.serializers)
+        update_size = len(update_bin)
+
+        # +------------------------------------------------+
+        # | Case1: The update is smaller than current data |
+        # +------------------------------------------------+
+        def case_inplace(io):
+            print("Case inplace")
+            io.seek(offset)
+            io.write(update_bin)
+
+        # +-------------------------------+
+        # | Case2: The item is at the end |
+        # +-------------------------------+
+        def case_truncate(io):
+            print("Case truncate")
+            io.seek(offset)
+            io.truncate()
+            io.write(update_bin)
+
+        # +--------------------------------+
+        # | Case 3: Generic, append to end |
+        # +--------------------------------+
+        def case_fallback(io):
+            print("Case fallback")
+            io.seek(0, SEEK_END)
+            new_offset = io.tell()
+            io.write(update_bin)
+            self.index[k] = new_offset
+
+        with open(self.path, "rb+") as io:
+            # +--------------------------------------------+
+            # | Calculate total size, including the header |
+            # +--------------------------------------------+
+            io.seek(offset)
+            headers = unpack_headers_(io, N)
+            data_size = sum(headers) + INDEX_SIZE * N
+
+            # +-------------------------------------------------------+
+            # | Handle cases, the case when the item is at the end    |
+            # | shoud have higher priority since it does not fragment |
+            # | the data                                              |
+            # +-------------------------------------------------------+
+            if offset + data_size >= last_bytes:
+                case_truncate(io)
+            elif update_size <= data_size:
+                case_inplace(io)
+            else:
+                case_fallback(io)
 
     def append(self, items: Tuple):
         """Append new items to the dataset.
@@ -441,25 +548,12 @@ class IndexedRecordDataset:
         Args:
             items (Tuple): A single data sample.
         """
-        if not os.path.isfile(self.path) or len(self) == 0:
-            with open(self.path, "wb") as io:
-                io.write(RESERVED_BYTES)
-
-        msg = "You need serializers for reading the data"
-        assert self.serializers is not None, msg
-        items_bin = [
-            serialize(items[i]) for i, serialize in enumerate(self.serializers)
-        ]
-        headers = [len(b) for b in items_bin]
-        headers_bin = [pack_index(h) for h in headers]
+        data_bin = pack_data(items, self.serializers)
         with open(self.path, "a+b") as io:
             io.seek(0, SEEK_END)
             idx = io.tell()
             self.index.append(idx)
-            for b in headers_bin:
-                io.write(b)
-            for b in items_bin:
-                io.write(b)
+            io.write(data_bin)
 
 
 class EzRecordDataset(IndexedRecordDataset):
