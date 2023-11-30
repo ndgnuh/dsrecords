@@ -1,6 +1,6 @@
 stages:
     - test
-    - docs
+    - publish
 
 run-test:
     stage: test
@@ -13,7 +13,7 @@ run-test:
         - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/
 
 pages:
-    stage: docs
+    stage: publish
     image: python:3.11-slim-bookworm
     script:
         - pip install -r requirements.txt
@@ -25,3 +25,17 @@ pages:
         expire_in: 1 days
         paths:
         - public
+    needs:
+      - run-test
+
+build-release:
+    stage: publish
+    image: python:3.11-slim-bookworm
+    script:
+        - pip install build twine
+        - python -m build
+        - twine upload dist/*.tar.gz -u __token__ -p "$PYPI_TOKEN"
+    rules:
+        - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/ && $CI_COMMIT_MESSAGE =~ /\[release\]/
+    needs:
+        - run-test
