@@ -39,3 +39,5 @@ build-release:
         - if: $CI_COMMIT_MESSAGE =~ /\[CI\]/ && $CI_COMMIT_MESSAGE =~ /\[release\]/
     needs:
         - run-test
+
+# vim:set sw=4
