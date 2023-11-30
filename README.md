@@ -1,21 +1,25 @@
+
 # Dead Simple Records
 
+
 Easy to hack and dead simple RecordIO-like data storing. Inspired by MXNet's RecordIO and Protobuf.
+
+- [Documentations](https://ndgnuh.gitlab.io/dsrecords/)
 
 ## (planned) features
 
 - [x] Binary-based data format with index file
 - [x] Easy custom serialization schemes
 - [x] Common serialization schemes (more TBA)
-- [ ] Documentation
+- [x] Documentation
+- [x] Append, update, delete data sample
+- [ ] Pack/unpack form
+- [ ] Schema serialization
 
 ## Quick start
+See the overview section in the [documentations](https://ndgnuh.gitlab.io/dsrecords/).
 
-See [this notebook](https://github.com/ndgnuh/ezrecords/blob/master/Examples.ipynb) for how to use the library.
-
-## Motivation
-
-TBA
+Also, check out [this notebook](https://github.com/ndgnuh/ezrecords/blob/master/Examples.ipynb) for a quick example, this notebook has not been updated in a while though.
 
 ## How does it work?
 
