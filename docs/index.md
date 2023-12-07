@@ -35,13 +35,13 @@ ys = [math.sin(x) for x in xs]
 zs = [int(x) for x in xs]
 
 # Setup the schema
-serializers = [io.save_float, io.save_float, io.save_int]
+dumpers = [io.dump_float, io.dump_float, io.dump_int]
 
 # Generate the record dataset files
 output_path, index_path = make_dataset(
     zip(xs, ys, zs),
     output_path,
-    serializers
+    dumpers
 )
 ```
 
@@ -59,10 +59,10 @@ ys = [math.sin(x) for x in xs]
 zs = [int(x) for x in xs]
 
 # Setup the schema
-serializers = [io.save_float, io.save_float, io.save_int]
+dumpers = [io.dump_float, io.dump_float, io.dump_int]
 
 # Generate the record dataset files
-data = IndexedRecordDataset(record_path, serializers=serializers)
+data = IndexedRecordDataset(record_path, dumpers=dumpers)
 for x, y, z in zip(xs, ys, zs):
     data.append([x, y, z])
 ```
@@ -86,10 +86,10 @@ from dsrecords import io, IndexedRecordDataset
 record_path = "my_data.rec"
 
 # Specify schema
-deserializers = [io.load_float, io.load_float, io.load_int]
+loaders = [io.load_float, io.load_float, io.load_int]
 
 # Load the data
-data = IndexedRecordDataset(record_path, deserializers=deserializers)
+data = IndexedRecordDataset(record_path, loaders=loaders)
 print(data[0])
 ```
 

@@ -8,14 +8,14 @@
 **All** serializers **must** returns `bytes`.
 
 ::: io.identity
-::: io.save_bool
-::: io.save_int
-::: io.save_float
-::: io.save_str
-::: io.save_raw_file
-::: io.save_pil
-::: io.save_np
-::: io.save_cv2
+::: io.dump_bool
+::: io.dump_int
+::: io.dump_float
+::: io.dump_str
+::: io.dump_raw_file
+::: io.dump_pil
+::: io.dump_np
+::: io.dump_cv2
 
 ## Built-in deserializers
 
@@ -36,18 +36,18 @@
 List (de)serizliers are higher order functions that helps you (de)serialize list of arbitrary items.
 
 - These are intended to be used when you have non-numeric, variable length data, such as strings.
-- The deserializer function is `io.load_list` and the serializer function is `io.save_list`.
-- The list (de)serializers receive `load_fn` and `save_fn` keyword arguments respectively.
-- The function `save_fn` is the function to serialize each of the items in the list.
-- The function `load_fn` is the function to deserialize one item from raw bytes.
+- The deserializer function is `io.load_list` and the serializer function is `io.dump_list`.
+- The list (de)serializers receive `loader` and `dumper` keyword arguments respectively.
+- The function `dumper` is the function to serialize each of the items in the list.
+- The function `loader` is the function to deserialize one item from raw bytes.
 
 #### Basic example usage
 
 Use it just like the other (de)serializers, just provide the item (de)serializer.
 ```python
 txt = "The quick brown fox jumps over the lazy dog".split()
-data_bin = io.save_list(txt, save_fn=io.save_str)
-txt_ = io.load_list(data_bin, load_fn=io.load_str)
+data_bin = io.dump_list(txt, dumper=io.dump_str)
+txt_ = io.load_list(data_bin, loader=io.load_str)
 assert " ".join(txt) == " ".join(txt_)
 ```
 
@@ -57,9 +57,9 @@ The list (de)serializers can also be partially applied:
 
 ```python
 txt = "The quick brown fox jumps over the lazy dog".split()
-save_fn = io.save_list(save_fn=io.save_str)
-load_fn = io.load_list(load_fn=io.load_str)
-txt_ = load_fn(save_fn(txt))
+dumper = io.dump_list(dumper=io.dump_str)
+loader = io.load_list(loader=io.load_str)
+txt_ = loader(dumper(txt))
 assert " ".join(txt) == " ".join(txt_)
 ```
 
@@ -75,12 +75,12 @@ txt_list = [
 nested_txt_list_1 = [txt.split(" ") for txt in txt_list]
 
 # Schemas
-save_fn = io.save_list(save_fn=io.save_list(save_fn=io.save_str))
-load_fn = io.load_list(load_fn=io.load_list(load_fn=io.load_str))
+dumper = io.dump_list(dumper=io.dump_list(dumper=io.dump_str))
+loader = io.load_list(loader=io.load_list(loader=io.load_str))
 
 # Serialize and deserialize
-data_bin = save_fn(nested_txt_list_1)
-nested_txt_list_2 = load_fn(data_bin)
+data_bin = dumper(nested_txt_list_1)
+nested_txt_list_2 = loader(data_bin)
 
 # Check
 txt_1 = "\n".join([" ".join(txt) for txt in nested_txt_list_1])
@@ -101,7 +101,7 @@ A quick "when to use which" list:
 - This was originally intended to be used with large image-and-text-mixed datasets.
 
 
-::: io.save_list
+::: io.dump_list
 ::: io.load_list
 
 ## Write your own
@@ -122,7 +122,7 @@ For example, this is how `numpy` (de)serializers are defined (`numpy` is lazy lo
 import numpy as np
 
 
-def save_np(x: np.ndarray):
+def dump_np(x: np.ndarray):
     with BytesIO() as io:
         np.save(io, x)
         bytes = io.getvalue()
@@ -145,7 +145,7 @@ from dsrecords import io
 
 
 @io.kurry
-def save_pil_jpeg(image, quality=95) -> bytes:
+def dump_pil_jpeg(image, quality=95) -> bytes:
     io = BytesIO()
     image.save(io, "JPEG", quality=quality)
     image_bin = io.getvalue()

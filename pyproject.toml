@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dsrecords"
 description = "Dead-simple and easy-to-hack RecordIO-like data storing. Inspired by MXNet's RecordIO and Protobuf."
-version = "0.4.16"
+version = "0.4.17"
 readme = "README.md"
 keywords = ["RecordIO"]
 license = { text = "MIT" }

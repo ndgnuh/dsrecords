@@ -92,7 +92,7 @@ def kurry(fn):
     return wrapped
 
 
-def save_raw_file(file_path: str) -> bytes:
+def dump_file(file_path: str) -> bytes:
     """Read raw file contents.
 
     Args:
@@ -105,7 +105,7 @@ def save_raw_file(file_path: str) -> bytes:
 
 
 @kurry
-def save_pil(image, format="JPEG", quality=95, **kwargs) -> bytes:
+def dump_pil(image, format="JPEG", quality=95, **kwargs) -> bytes:
     """Serialize a `Pillow.Image` to bytes.
 
     Any `Image.save`'s keyword arguments can be used by this function.
@@ -136,7 +136,7 @@ def load_pil(image_bin: bytes):
 
 
 @kurry
-def save_int(n: int, bits: int = 32, signed: bool = True):
+def dump_int(n: int, bits: int = 32, signed: bool = True):
     """Serialize int data.
 
     Args:
@@ -154,7 +154,7 @@ def save_int(n: int, bits: int = 32, signed: bool = True):
 
 
 @kurry
-def save_float(x: float, bits: int = 32):
+def dump_float(x: float, bits: int = 32):
     """Serialize floating point number.
 
     Args:
@@ -169,7 +169,7 @@ def save_float(x: float, bits: int = 32):
 
 
 @kurry
-def save_str(s: str, encoding: str = "utf-8"):
+def dump_str(s: str, encoding: str = "utf-8"):
     """Serialize string data
 
     Args:
@@ -182,7 +182,7 @@ def save_str(s: str, encoding: str = "utf-8"):
 
 
 @kurry
-def save_bool(b: bool):
+def dump_bool(b: bool):
     """Serialize bool data"""
     return struct.pack("<?", b)
 
@@ -195,14 +195,14 @@ def load_bool(b: bool):
 
 @kurry
 def load_int(data: bytes, bits: int = 32, signed: bool = True):
-    """Deserialize integers, see `io.save_int` for options."""
+    """Deserialize integers, see `io.dump_int` for options."""
     fmt = _get_int_fmt(bits, signed)
     return struct.unpack(fmt, data)[0]
 
 
 @kurry
 def load_float(data: bytes, bits: int = 32):
-    """Deserialize floats, see `io.save_float` for options."""
+    """Deserialize floats, see `io.dump_float` for options."""
     fmt = _get_float_fmt(bits)
     return struct.unpack(fmt, data)[0]
 
@@ -220,7 +220,7 @@ def load_str(data: bytes, encoding: str = "utf-8"):
     return data.decode(encoding)
 
 
-def save_np(x):
+def dump_np(x):
     """Serialize a numpy array.
 
     Args:
@@ -252,13 +252,19 @@ def identity(bs: bytes) -> bytes:
 
 
 @kurry
-def save_list(lst: List[T], save_fn: Callable[T, bytes]) -> bytes:
+def dump_list(lst: List[T], dumper: Callable[T, bytes] = None, save_fn=None) -> bytes:
     """Serialize list of arbitrary items.
 
     Args:
         lst (List[T]): A list of items of type `T`.
-        save_fn (Callable[T, bytes]): The function to serialize data of type `T`.
+        dumper (Callable[T, bytes]): The function to serialize data of type `T`.
     """
+    if save_fn is not None:
+        dumper = save_fn
+        warnings.warn(
+            "Please use `dumper` instead of `save_fn`, this option will be removed in the near future",
+            DeprecationWarning,
+        )
     # Because without length, the deserializer will have to read until read result is empty
     # a while-true loop in a repeatedly called function seems pretty cursed
     n = len(lst)
@@ -266,7 +272,7 @@ def save_list(lst: List[T], save_fn: Callable[T, bytes]) -> bytes:
         length = struct.pack("<L", len(lst))
         f.write(length)
         for item in lst:
-            data = save_fn(item)
+            data = dumper(item)
             header = struct.pack("<L", len(data))
             f.write(header)
             f.write(data)
@@ -276,19 +282,26 @@ def save_list(lst: List[T], save_fn: Callable[T, bytes]) -> bytes:
 
 
 @kurry
-def load_list(data, load_fn):
+def load_list(data: bytes, loader: Callable[bytes, T] = None, load_fn=None) -> List[T]:
     """Deserialize list of arbitrary items.
 
     Args:
         data (bytes): Raw data.
-        load_fn (Callable[bytes, T]): The function to serialize data of type `T`.
+        loader (Callable[bytes, T]): The function to serialize data of type `T`.
     """
+
+    if load_fn is not None:
+        loader = load_fn
+        warnings.warn(
+            "Please use loader instead of load_fn, this option will be removed in the near future",
+            DeprecationWarning,
+        )
 
     def wrapped_deserializer(f):
         # Unsigned long is 4 bit
         header = f.read(4)
         (n,) = struct.unpack("<L", header)
-        data = load_fn(f.read(n))
+        data = loader(f.read(n))
         return data
 
     with BytesIO(data) as f:
@@ -298,7 +311,7 @@ def load_list(data, load_fn):
 
 
 @kurry
-def save_cv2(image, ext: str, flags: Optional[List] = None) -> bytes:
+def dump_cv2(image, ext: str, flags: Optional[List] = None) -> bytes:
     """Use `cv2.imencode` to encode image to bytes.
 
     Args:
@@ -308,7 +321,7 @@ def save_cv2(image, ext: str, flags: Optional[List] = None) -> bytes:
 
     Example:
         ```python
-        serialize = cv2_save(ext='.jpeg')
+        serialize = cv2_dump(ext='.jpeg')
         serialize(np.random.rand(300, 300, 3).astype('float32'))
         ```
     """
@@ -341,8 +354,7 @@ def load_cv2(image_bin: bytes, flags: Optional[List] = None):
 # Deprecated serializers
 
 
-_deprecated("file_serialize", save_raw_file)
-_deprecated("pil_serialize", save_pil)
-_deprecated("np_save", save_np)
-_deprecated("int32_serialize", save_int(bits=32, signed=False))
-_deprecated("int32_deserialize", save_int(bits=32, signed=False))
+for k, v in dict(locals()).items():
+    if k.startswith("dump_"):
+        _deprecated(k.replace("dump_", "save_"), v)
+_deprecated("save_raw_file", dump_file)

@@ -84,15 +84,15 @@ def unpack_index(idx_bin: bytes) -> int:
     return struct.unpack(INDEX_FMT, idx_bin)[0]
 
 
-def pack_data(items: Tuple, serializers: List) -> bytes:
+def pack_data(items: Tuple, dumpers: List) -> bytes:
     """Serialize data to bytes with header and such
 
     Args:
         items (Tuple): Tuple of items.
-        serializers (List[Callable]): List of serialize function.
+        dumpers (List[Callable]): List of serialize function.
     """
     iter_ = enumerate(items)
-    items_bin = [serializers[i](item) for i, item in iter_]
+    items_bin = [dumpers[i](item) for i, item in iter_]
     headers = [pack_index(len(b)) for b in items_bin]
     outputs = b"".join(headers + items_bin)
     return outputs
@@ -108,15 +108,15 @@ def unpack_headers_(io, n: int) -> List[int]:
     return [unpack_index(io.read(INDEX_SIZE)) for i in range(n)]
 
 
-def unpack_data_(io, headers: List[int], deserializers: List):
+def unpack_data_(io, headers: List[int], loaders: List):
     """Deserialize data from io. This function change the file pointer.
 
     Args:
         io (File): The file object.
         headers (List[int]): List of item size.
-        deserializers (List[Callable]): List of deserialize functions.
+        loaders (List[Callable]): List of deserialize functions.
     """
-    items = [deserializers[i](io.read(h)) for i, h in enumerate(headers)]
+    items = [loaders[i](io.read(h)) for i, h in enumerate(headers)]
     return items
 
 
@@ -334,7 +334,7 @@ class IndexFile:
 def make_dataset(
     record_iters: Iterable,
     output: str,
-    serializers: List,
+    dumpers: List,
     index_path: Optional[str] = None,
 ):
     indices = []
@@ -342,7 +342,7 @@ def make_dataset(
         output,
         index_path,
         create=True,
-        serializers=serializers,
+        dumpers=dumpers,
     )
     # Write record file
     for items in record_iters:
@@ -360,11 +360,11 @@ class IndexedRecordDataset:
     Attributes:
         path (str):
             Path to the dataset file.
-        deserializers (Optional[List[Callable]]):
+        loaders (Optional[List[Callable]]):
             A list of functions that take a `bytes` and return something.
             This is required for accessing data.
             Default: `None`.
-        serializers (Optional[List[Callable]]):
+        dumpers (Optional[List[Callable]]):
             A list of functions that take something and return a `bytes`.
             This is required for appending new samples.
             Default: `None`.
@@ -384,11 +384,13 @@ class IndexedRecordDataset:
     def __init__(
         self,
         path: str,
-        deserializers: Optional[List] = None,
-        serializers: Optional[List] = None,
+        loaders: Optional[List] = None,
+        dumpers: Optional[List] = None,
         index_path: Optional[str] = None,
         create: bool = False,
         transform: Optional[Callable] = None,
+        deserializers: Optional[List] = None,
+        serializers: Optional[List] = None,
     ):
         if index_path is None:
             index_path = os.path.splitext(path)[0] + ".idx"
@@ -398,15 +400,42 @@ class IndexedRecordDataset:
             msg = f"Data file {path} does not exist, use `create = True` to create one"
             assert os.path.exists(path), msg
         self.path = path
-        self.deserializers = deserializers
-        self.serializers = serializers
+        self.loaders = loaders if loaders is not None else deserializers
+        self.dumpers = dumpers if dumpers is not None else serializers
         self.index = IndexFile(index_path)
         self.transform = transform
+
+        # +---------------------+
+        # | Deprecation warning |
+        # +---------------------+
+        self.deprecation_msg = """Please use loaders and dumpers instead of deserializers and serializers. Starting from dsrecords 0.5.x, all the core and io functions will follow this dump and load convention. The old function names will be removed"""
+        if deserializers is not None or serializers is not None:
+            warnings.warn(self.deprecation_msg, DeprecationWarning)
+
+    @property
+    def serializers(self):
+        warnings.warn(self.deprecation_msg, DeprecationWarning)
+        return self.dumpers
+
+    @property
+    def deserializers(self):
+        warnings.warn(self.deprecation_msg, DeprecationWarning)
+        return self.loaders
+
+    @serializers.setter
+    def set_serializers(self, dumpers):
+        warnings.warn(self.deprecation_msg, DeprecationWarning)
+        self.dumpers = dumpers
+
+    @deserializers.setter
+    def set_deserializers(self, loaders):
+        warnings.warn(self.deprecation_msg, DeprecationWarning)
+        self.loaders = loaders
 
     @cached_property
     def num_items(self):
         """Number of items in each data sample."""
-        return len(self.deserializers)
+        return len(self.loaders)
 
     def quick_remove_at(self, idx):
         """Just a wrapper for `IndexFile.remove_at`."""
@@ -423,26 +452,26 @@ class IndexedRecordDataset:
             The `defrag` operation use the order inside the index file, so the index will not be sorted.
         """
         ref_data = deepcopy(self)
-        ref_data.deserializers = [lambda x: x for _ in self.deserializers]
-        serializers = [lambda x: x for _ in self.deserializers]
+        ref_data.loaders = [lambda x: x for _ in self.loaders]
+        dumpers = [lambda x: x for _ in self.loaders]
 
         def data_iter():
             for item in ref_data:
                 yield item
 
-        return make_dataset(data_iter(), output_file, serializers=serializers)
+        return make_dataset(data_iter(), output_file, dumpers=dumpers)
 
     def __iter__(self):
         """Iterate through this dataset"""
         # first_offset = self.index[0]
         # length = len(self)
-        # deserializers = self.deserializers
+        # loaders = self.loaders
         # N = self.num_items
         # with open(self.path, "rb") as io:
         #     io.seek(first_offset)
         #     for _ in range(length):
         #         lens = [unpack_index(io.read(INDEX_SIZE)) for _ in range(N)]
-        #         items = [deserializers[i](io.read(n)) for i, n in enumerate(lens)]
+        #         items = [loaders[i](io.read(n)) for i, n in enumerate(lens)]
         #         yield items
         # <- Not thread safe
         N = len(self)
@@ -456,7 +485,7 @@ class IndexedRecordDataset:
         # +-------------+
         # | Preparation |
         # +-------------+
-        deserializers = self.deserializers
+        loaders = self.loaders
         transform = self.transform
         N = self.num_items
 
@@ -471,7 +500,7 @@ class IndexedRecordDataset:
             with open(self.path, "rb") as io:
                 io.seek(offset)
                 lens = unpack_headers_(io, N)
-                items = unpack_data_(io, lens, self.deserializers)
+                items = unpack_data_(io, lens, self.loaders)
             return items
         else:
             # +-----------------------------+
@@ -486,7 +515,7 @@ class IndexedRecordDataset:
                 for i in range(col_idx):
                     io.read(lens[i])
                 data_bin = io.read(lens[col_idx])
-                data = deserializers[col_idx](data_bin)
+                data = loaders[col_idx](data_bin)
             return data
 
     def __setitem__(self, k, v):
@@ -505,7 +534,7 @@ class IndexedRecordDataset:
         last_bytes = os.path.getsize(self.path)
         offset = self.index[k]
         N = self.num_items
-        update_bin = pack_data(v, self.serializers)
+        update_bin = pack_data(v, self.dumpers)
         update_size = len(update_bin)
 
         # +------------------------------------------------+
@@ -563,7 +592,7 @@ class IndexedRecordDataset:
         Args:
             items (Tuple): A single data sample.
         """
-        data_bin = pack_data(items, self.serializers)
+        data_bin = pack_data(items, self.dumpers)
         with open(self.path, "a+b") as io:
             io.seek(0, SEEK_END)
             idx = io.tell()
