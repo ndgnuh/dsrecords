@@ -12,7 +12,7 @@
 ::: io.dump_int
 ::: io.dump_float
 ::: io.dump_str
-::: io.dump_raw_file
+::: io.dump_file
 ::: io.dump_pil
 ::: io.dump_np
 ::: io.dump_cv2
