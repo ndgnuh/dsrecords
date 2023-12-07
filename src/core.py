@@ -400,8 +400,8 @@ class IndexedRecordDataset:
             msg = f"Data file {path} does not exist, use `create = True` to create one"
             assert os.path.exists(path), msg
         self.path = path
-        self.loaders = loaders if loaders is not None else deserializers
-        self.dumpers = dumpers if dumpers is not None else serializers
+        self.loaders = loaders
+        self.dumpers = dumpers
         self.index = IndexFile(index_path)
         self.transform = transform
 
@@ -410,27 +410,27 @@ class IndexedRecordDataset:
         # +---------------------+
         self.deprecation_msg = """Please use loaders and dumpers instead of deserializers and serializers. Starting from dsrecords 0.5.x, all the core and io functions will follow this dump and load convention. The old function names will be removed"""
         if deserializers is not None or serializers is not None:
-            warnings.warn(self.deprecation_msg, DeprecationWarning)
+            self.deserializers = deserializers
+            self.serializers = serializers
 
-    @property
-    def serializers(self):
+    def get_serializers(self):
         warnings.warn(self.deprecation_msg, DeprecationWarning)
         return self.dumpers
 
-    @property
-    def deserializers(self):
+    def get_deserializers(self):
         warnings.warn(self.deprecation_msg, DeprecationWarning)
         return self.loaders
 
-    @serializers.setter
     def set_serializers(self, dumpers):
         warnings.warn(self.deprecation_msg, DeprecationWarning)
         self.dumpers = dumpers
 
-    @deserializers.setter
     def set_deserializers(self, loaders):
         warnings.warn(self.deprecation_msg, DeprecationWarning)
         self.loaders = loaders
+
+    serializers = property(get_serializers, set_serializers)
+    deserializers = property(get_deserializers, set_deserializers)
 
     @cached_property
     def num_items(self):
